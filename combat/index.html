@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>COMBAT — Two Player Tank Game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0a;
+    color: #e0e0c0;
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 0.35em;
+    color: #f5e642;
+    text-shadow: 0 0 20px #f5e64288, 0 0 60px #f5e64222;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    font-size: 0.72rem;
+    letter-spacing: 0.25em;
+    color: #888;
+    margin-bottom: 16px;
+  }
+
+  .scoreboard {
+    display: flex;
+    gap: 60px;
+    margin-bottom: 12px;
+    font-size: 1rem;
+  }
+
+  .score-p1 { color: #4de1ff; text-shadow: 0 0 10px #4de1ff88; }
+  .score-p2 { color: #ff6b4d; text-shadow: 0 0 10px #ff6b4d88; }
+  .score-label { letter-spacing: 0.15em; }
+
+  #canvas {
+    border: 2px solid #333;
+    display: block;
+    background: #111;
+    image-rendering: pixelated;
+  }
+
+  .controls {
+    margin-top: 14px;
+    display: flex;
+    gap: 60px;
+    font-size: 0.68rem;
+    color: #555;
+  }
+
+  .ctrl-p1 { color: #4de1ff88; }
+  .ctrl-p2 { color: #ff6b4d88; }
+
+  .winner-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #000000cc;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    font-family: 'Orbitron', sans-serif;
+  }
+
+  .winner-overlay.show { display: flex; }
+  .winner-text { font-size: 3rem; font-weight: 900; letter-spacing: 0.1em; }
+  .winner-sub { margin-top: 12px; font-size: 0.8rem; letter-spacing: 0.3em; color: #888; font-family: 'Share Tech Mono', monospace; }
+  .restart-btn {
+    margin-top: 30px;
+    background: none;
+    border: 2px solid #f5e642;
+    color: #f5e642;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    padding: 10px 30px;
+    cursor: pointer;
+    text-shadow: 0 0 10px #f5e64288;
+    transition: background 0.2s;
+  }
+  .restart-btn:hover { background: #f5e64222; }
+</style>
+</head>
+<body>
+
+<h1>COMBAT</h1>
+<div class="subtitle">ATARI 2600 · 1977 · TWO PLAYER</div>
+
+<div class="scoreboard">
+  <div class="score-p1 score-label">P1 <span id="s1">0</span></div>
+  <div class="score-p2 score-label">P2 <span id="s2">0</span></div>
+</div>
+
+<canvas id="canvas" width="600" height="480"></canvas>
+
+<div class="controls">
+  <div class="ctrl-p1">P1: WASD + SPACE</div>
+  <div class="ctrl-p2">P2: ARROWS + ENTER</div>
+</div>
+
+<div class="winner-overlay" id="winOverlay">
+  <div class="winner-text" id="winText"></div>
+  <div class="winner-sub">FIRST TO 10 HITS WINS</div>
+  <button class="restart-btn" onclick="restartGame()">PLAY AGAIN</button>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+const TILE = 40;
+const COLS = W / TILE, ROWS = H / TILE;
+
+// Maze walls as rect {x,y,w,h} in pixels
+const WALLS = [
+  // Border
+  {x:0,y:0,w:W,h:TILE},
+  {x:0,y:H-TILE,w:W,h:TILE},
+  {x:0,y:0,w:TILE,h:H},
+  {x:W-TILE,y:0,w:TILE,h:H},
+  // Interior walls
+  {x:TILE*3,y:TILE*2,w:TILE,h:TILE*3},
+  {x:TILE*6,y:TILE*1,w:TILE*2,h:TILE},
+  {x:TILE*9,y:TILE*3,w:TILE,h:TILE*4},
+  {x:TILE*4,y:TILE*7,w:TILE*3,h:TILE},
+  {x:TILE*2,y:TILE*9,w:TILE*2,h:TILE},
+  {x:TILE*7,y:TILE*8,w:TILE,h:TILE*3},
+  {x:TILE*5,y:TILE*5,w:TILE,h:TILE},
+  {x:TILE*11,y:TILE*2,w:TILE,h:TILE*3},
+  {x:TILE*12,y:TILE*7,w:TILE*2,h:TILE},
+];
+
+let p1, p2, bullets, score1, score2;
+
+function initGame() {
+  p1 = { x:80, y:240, angle:0, color:'#4de1ff', shadow:'#4de1ff', reload:0 };
+  p2 = { x:520, y:240, angle:Math.PI, color:'#ff6b4d', shadow:'#ff6b4d', reload:0 };
+  bullets = [];
+  score1 = 0;
+  score2 = 0;
+  updateScore();
+}
+
+function updateScore() {
+  document.getElementById('s1').textContent = score1;
+  document.getElementById('s2').textContent = score2;
+}
+
+const TANK_SIZE = 14;
+const BULLET_SPEED = 5;
+const TANK_SPEED = 2;
+const TURN_SPEED = 0.05;
+
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+function rectOverlap(ax,ay,aw,ah, bx,by,bw,bh) {
+  return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
+}
+
+function wallCollide(x,y,size) {
+  const hs = size;
+  for (const w of WALLS) {
+    if (rectOverlap(x-hs,y-hs,hs*2,hs*2, w.x,w.y,w.w,w.h)) return true;
+  }
+  return false;
+}
+
+function moveTank(tank, fwd, turn) {
+  tank.angle += turn * TURN_SPEED;
+  if (fwd !== 0) {
+    const nx = tank.x + Math.cos(tank.angle) * TANK_SPEED * fwd;
+    const ny = tank.y + Math.sin(tank.angle) * TANK_SPEED * fwd;
+    if (!wallCollide(nx, ny, TANK_SIZE)) {
+      tank.x = nx; tank.y = ny;
+    }
+  }
+}
+
+function fireBullet(tank, owner) {
+  if (tank.reload > 0) return;
+  tank.reload = 40;
+  bullets.push({
+    x: tank.x + Math.cos(tank.angle)*TANK_SIZE,
+    y: tank.y + Math.sin(tank.angle)*TANK_SIZE,
+    vx: Math.cos(tank.angle)*BULLET_SPEED,
+    vy: Math.sin(tank.angle)*BULLET_SPEED,
+    owner,
+    bounces: 2
+  });
+}
+
+function drawTank(tank) {
+  ctx.save();
+  ctx.translate(tank.x, tank.y);
+  ctx.rotate(tank.angle);
+  // Body
+  ctx.shadowColor = tank.shadow;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = tank.color;
+  ctx.fillRect(-TANK_SIZE, -TANK_SIZE*0.6, TANK_SIZE*2, TANK_SIZE*1.2);
+  // Treads
+  ctx.fillStyle = tank.color + '88';
+  ctx.fillRect(-TANK_SIZE, -TANK_SIZE*0.85, TANK_SIZE*2, TANK_SIZE*0.25);
+  ctx.fillRect(-TANK_SIZE, TANK_SIZE*0.6, TANK_SIZE*2, TANK_SIZE*0.25);
+  // Turret
+  ctx.fillStyle = tank.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, TANK_SIZE*0.45, 0, Math.PI*2);
+  ctx.fill();
+  // Barrel
+  ctx.fillStyle = tank.color;
+  ctx.fillRect(0, -TANK_SIZE*0.13, TANK_SIZE*1.1, TANK_SIZE*0.26);
+  ctx.restore();
+}
+
+function drawWalls() {
+  ctx.fillStyle = '#2a2a2a';
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  for (const w of WALLS) {
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.strokeRect(w.x, w.y, w.w, w.h);
+    // scanline texture
+    ctx.fillStyle = '#ffffff08';
+    for (let yy = w.y; yy < w.y+w.h; yy+=6) {
+      ctx.fillRect(w.x, yy, w.w, 2);
+    }
+    ctx.fillStyle = '#2a2a2a';
+  }
+}
+
+function drawBullet(b) {
+  ctx.save();
+  ctx.shadowColor = '#ffe86b';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ffe86b';
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function updateBullets() {
+  for (let i = bullets.length-1; i >= 0; i--) {
+    const b = bullets[i];
+    b.x += b.vx;
+    b.y += b.vy;
+
+    // Wall bounce
+    let hit = false;
+    for (const w of WALLS) {
+      if (b.x > w.x && b.x < w.x+w.w && b.y > w.y && b.y < w.y+w.h) {
+        // Determine axis of collision
+        const overlapL = b.x - w.x;
+        const overlapR = w.x+w.w - b.x;
+        const overlapT = b.y - w.y;
+        const overlapB = w.y+w.h - b.y;
+        const minH = Math.min(overlapL, overlapR);
+        const minV = Math.min(overlapT, overlapB);
+        if (minH < minV) b.vx *= -1; else b.vy *= -1;
+        b.bounces--;
+        if (b.bounces < 0) { bullets.splice(i,1); hit=true; }
+        break;
+      }
+    }
+    if (hit) continue;
+
+    // Check hit on tanks
+    const targets = b.owner === 1 ? [p2] : [p1];
+    for (const t of targets) {
+      const dx = b.x - t.x, dy = b.y - t.y;
+      if (Math.sqrt(dx*dx+dy*dy) < TANK_SIZE*1.1) {
+        if (b.owner === 1) { score1++; } else { score2++; }
+        updateScore();
+        bullets.splice(i,1);
+        // Flash
+        t.flash = 10;
+        checkWin();
+        break;
+      }
+    }
+  }
+}
+
+function checkWin() {
+  if (score1 >= 10 || score2 >= 10) {
+    const ov = document.getElementById('winOverlay');
+    const wt = document.getElementById('winText');
+    ov.classList.add('show');
+    if (score1 >= 10) {
+      wt.textContent = 'PLAYER 1 WINS';
+      wt.style.color = '#4de1ff';
+    } else {
+      wt.textContent = 'PLAYER 2 WINS';
+      wt.style.color = '#ff6b4d';
+    }
+  }
+}
+
+function restartGame() {
+  document.getElementById('winOverlay').classList.remove('show');
+  initGame();
+}
+
+// Scanline overlay
+function drawScanlines() {
+  ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  for (let y=0; y<H; y+=3) ctx.fillRect(0,y,W,1);
+}
+
+let lastTime = 0;
+function loop(ts) {
+  ctx.clearRect(0,0,W,H);
+  // Background grid
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 1;
+  for (let x=0;x<=W;x+=TILE) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0;y<=H;y+=TILE) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  drawWalls();
+
+  // P1 input
+  let f1=0, t1=0;
+  if (keys['KeyW']) f1=1;
+  if (keys['KeyS']) f1=-1;
+  if (keys['KeyA']) t1=-1;
+  if (keys['KeyD']) t1=1;
+  if (keys['Space']) fireBullet(p1,1);
+
+  // P2 input
+  let f2=0, t2=0;
+  if (keys['ArrowUp']) f2=1;
+  if (keys['ArrowDown']) f2=-1;
+  if (keys['ArrowLeft']) t2=-1;
+  if (keys['ArrowRight']) t2=1;
+  if (keys['Enter']) fireBullet(p2,2);
+
+  moveTank(p1,f1,t1);
+  moveTank(p2,f2,t2);
+  if (p1.reload>0) p1.reload--;
+  if (p2.reload>0) p2.reload--;
+
+  updateBullets();
+
+  // Draw flash effect
+  if (p1.flash > 0) { p1.flash--; ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p1.x,p1.y,TANK_SIZE*1.5,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+  if (p2.flash > 0) { p2.flash--; ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p2.x,p2.y,TANK_SIZE*1.5,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+
+  drawTank(p1);
+  drawTank(p2);
+  bullets.forEach(drawBullet);
+  drawScanlines();
+
+  requestAnimationFrame(loop);
+}
+
+initGame();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
