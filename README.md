@@ -6,9 +6,10 @@ I'm not super into using AI for coding so this is gonna be an exercise in foolin
 
 ## The Directory
 
-| Name of App | Tool Used |
-|-------------|-----------|
-| [Atari Combat](https://vibes.prannay.dev/combat) | Claude Web App (Single Prompt) |
-| [Atari Combat in 3D](https://vibes.prannay.dev/combat/3d) | Claude Web App (3x Prompts) |
+| Name of App                                                    | Tool Used                      | Model             |
+| -------------------------------------------------------------- | ------------------------------ | ----------------- |
+| [Atari Combat](https://vibes.prannay.dev/combat)               | Claude Web App (Single Prompt) | Claude Sonnet 3.6 |
+| [Atari Combat in 3D](https://vibes.prannay.dev/combat/3d)      | Claude Web App (3x Prompts)    | Claude Sonnet 3.6 |
+| [Lightsabers Jedi Duel](https://vibes.prannay.dev/lightsabers) | Claude Web App (Single Prompt) | Claude Sonnet 3.6 |
 
 Hopefully as I do this, I'll learn more about how to vibe code and what the best practices are. Till then, let's just fool around a bit with these tools :)

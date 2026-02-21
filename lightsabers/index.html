@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JEDI DUEL — Star Wars</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Orbitron', monospace;
+    cursor: crosshair;
+  }
+
+  #canvas { display: block; }
+
+  #ui {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #hud {
+    position: absolute;
+    top: 20px; left: 20px; right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .player-hud {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+  }
+
+  .player-hud.right { align-items: flex-end; }
+
+  .hud-label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+  }
+
+  .health-bar-container {
+    width: 200px;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .health-bar {
+    height: 100%;
+    transition: width 0.3s ease;
+    position: relative;
+  }
+
+  .health-bar::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 2px; height: 100%;
+    background: rgba(255,255,255,0.8);
+    animation: pulse 1s infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  #player-health-bar { background: linear-gradient(90deg, #00aaff, #0066ff); box-shadow: 0 0 10px #00aaff; }
+  #enemy-health-bar { background: linear-gradient(90deg, #ff2200, #ff6600); box-shadow: 0 0 10px #ff2200; }
+
+  .health-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    color: #fff;
+  }
+
+  #center-hud {
+    text-align: center;
+    pointer-events: none;
+  }
+
+  #title-text {
+    font-size: 13px;
+    letter-spacing: 6px;
+    color: rgba(255, 200, 0, 0.7);
+    text-shadow: 0 0 20px rgba(255,200,0,0.5);
+    margin-bottom: 4px;
+  }
+
+  #score-display {
+    font-size: 28px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(255,255,255,0.5);
+    letter-spacing: 4px;
+  }
+
+  #combo-display {
+    font-size: 14px;
+    color: rgba(255,200,0,0.9);
+    letter-spacing: 3px;
+    min-height: 20px;
+    text-shadow: 0 0 15px rgba(255,200,0,0.8);
+  }
+
+  #controls-hint {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: rgba(255,255,255,0.3);
+    font-size: 10px;
+    letter-spacing: 2px;
+    line-height: 1.8;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  #crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px; height: 20px;
+    pointer-events: none;
+  }
+
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(255,255,255,0.6);
+  }
+  #crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
+  #crosshair::after { height: 2px; width: 100%; top: 50%; transform: translateY(-50%); }
+
+  #screen-flash {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  #hit-indicator {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+    font-weight: 900;
+    opacity: 0;
+    letter-spacing: 4px;
+    text-shadow: 0 0 30px currentColor;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  #game-over {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.85);
+    opacity: 0;
+    transition: opacity 1s;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+  }
+
+  #game-over.show { opacity: 1; pointer-events: all; }
+
+  #game-over h1 {
+    font-size: 60px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    margin-bottom: 16px;
+  }
+
+  #game-over p {
+    font-family: 'Share Tech Mono', monospace;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 3px;
+    margin-bottom: 40px;
+    font-size: 13px;
+  }
+
+  #restart-btn {
+    pointer-events: all;
+    background: transparent;
+    border: 2px solid rgba(255,200,0,0.6);
+    color: rgba(255,200,0,0.9);
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    letter-spacing: 4px;
+    padding: 14px 40px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-shadow: 0 0 10px rgba(255,200,0,0.5);
+    box-shadow: 0 0 20px rgba(255,200,0,0.1), inset 0 0 20px rgba(255,200,0,0.05);
+  }
+
+  #restart-btn:hover {
+    background: rgba(255,200,0,0.1);
+    box-shadow: 0 0 40px rgba(255,200,0,0.3), inset 0 0 40px rgba(255,200,0,0.1);
+  }
+
+  .stars-bg {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: -1;
+    background: radial-gradient(ellipse at center, #0a0a1a 0%, #000 100%);
+  }
+</style>
+</head>
+<body>
+
+<div class="stars-bg"></div>
+<canvas id="canvas"></canvas>
+
+<div id="ui">
+  <div id="hud">
+    <div class="player-hud">
+      <div class="hud-label">Jedi Knight</div>
+      <div class="health-bar-container">
+        <div class="health-bar" id="player-health-bar" style="width:100%"></div>
+      </div>
+      <div class="health-text" id="player-hp">100</div>
+    </div>
+
+    <div id="center-hud">
+      <div id="title-text">⚔ JEDI DUEL ⚔</div>
+      <div id="score-display">000</div>
+      <div id="combo-display"></div>
+    </div>
+
+    <div class="player-hud right">
+      <div class="hud-label">Sith Lord</div>
+      <div class="health-bar-container">
+        <div class="health-bar" id="enemy-health-bar" style="width:100%"></div>
+      </div>
+      <div class="health-text" id="enemy-hp">100</div>
+    </div>
+  </div>
+
+  <div id="crosshair"></div>
+  <div id="screen-flash"></div>
+  <div id="hit-indicator"></div>
+
+  <div id="controls-hint">
+    MOUSE — AIM &nbsp;|&nbsp; LEFT CLICK — SWING &nbsp;|&nbsp; RIGHT CLICK — FORCE PUSH &nbsp;|&nbsp; WASD — MOVE &nbsp;|&nbsp; SPACE — DODGE
+  </div>
+
+  <div id="game-over">
+    <h1 id="game-over-title">GAME OVER</h1>
+    <p id="game-over-subtitle">THE FORCE WAS NOT WITH YOU</p>
+    <button id="restart-btn" onclick="restartGame()">RISE AGAIN</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── SCENE SETUP ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000011, 0.04);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 2.5, 8);
+camera.lookAt(0, 1.5, 0);
+
+// ─── LIGHTING ────────────────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x111133, 1);
+scene.add(ambientLight);
+
+const pointLight1 = new THREE.PointLight(0x0066ff, 3, 30);
+pointLight1.position.set(-3, 5, 3);
+scene.add(pointLight1);
+
+const pointLight2 = new THREE.PointLight(0xff2200, 3, 30);
+pointLight2.position.set(3, 5, 3);
+scene.add(pointLight2);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+dirLight.position.set(0, 20, 10);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+// ─── ENVIRONMENT ─────────────────────────────────────────────────────────────
+// Floor
+const floorGeo = new THREE.PlaneGeometry(80, 80, 20, 20);
+const floorMat = new THREE.MeshStandardMaterial({
+  color: 0x0a0a1a,
+  roughness: 0.1,
+  metalness: 0.8,
+  wireframe: false
+});
+
+const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+floorMesh.rotation.x = -Math.PI / 2;
+floorMesh.receiveShadow = true;
+scene.add(floorMesh);
+
+// Floor grid
+const gridHelper = new THREE.GridHelper(80, 40, 0x001133, 0x001133);
+gridHelper.position.y = 0.01;
+scene.add(gridHelper);
+
+// Pillars
+function createPillar(x, z) {
+  const geo = new THREE.CylinderGeometry(0.4, 0.4, 12, 8);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x111122, metalness: 0.9, roughness: 0.2 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, 6, z);
+  mesh.castShadow = true;
+  scene.add(mesh);
+}
+[[-8,-5],[8,-5],[-8,5],[8,5],[-12,0],[12,0]].forEach(([x,z]) => createPillar(x,z));
+
+// Stars
+const starsGeo = new THREE.BufferGeometry();
+const starVerts = [];
+for (let i = 0; i < 3000; i++) {
+  starVerts.push((Math.random()-0.5)*300, (Math.random())*150+5, (Math.random()-0.5)*300);
+}
+starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, sizeAttenuation: true });
+scene.add(new THREE.Points(starsGeo, starsMat));
+
+// ─── LIGHTSABER BUILDER ───────────────────────────────────────────────────────
+function createLightsaber(color, glowColor) {
+  const group = new THREE.Group();
+
+  // Hilt
+  const hiltGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.6, 12);
+  const hiltMat = new THREE.MeshStandardMaterial({ color: 0x888899, metalness: 1, roughness: 0.2 });
+  const hilt = new THREE.Mesh(hiltGeo, hiltMat);
+  group.add(hilt);
+
+  // Blade
+  const bladeGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.6, 8);
+  const bladeMat = new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: color,
+    emissiveIntensity: 3,
+    transparent: true,
+    opacity: 0.95
+  });
+  const blade = new THREE.Mesh(bladeGeo, bladeMat);
+  blade.position.y = 1.1;
+  group.add(blade);
+
+  // Glow outer
+  const glowGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.6, 8);
+  const glowMat = new THREE.MeshStandardMaterial({
+    color: glowColor,
+    emissive: glowColor,
+    emissiveIntensity: 1,
+    transparent: true,
+    opacity: 0.15
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.y = 1.1;
+  group.add(glow);
+
+  // Lightsaber glow light
+  const saberLight = new THREE.PointLight(glowColor, 2, 5);
+  saberLight.position.y = 1.5;
+  group.add(saberLight);
+
+  return { group, blade, bladeMat, glow, saberLight };
+}
+
+// ─── PLAYER ──────────────────────────────────────────────────────────────────
+function createCharacter(isPlayer) {
+  const group = new THREE.Group();
+  const color = isPlayer ? 0x223344 : 0x220000;
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.3 });
+
+  // Body
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.4), mat);
+  body.position.y = 1.15;
+  body.castShadow = true;
+  group.add(body);
+
+  // Head
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), mat);
+  head.position.y = 2.1;
+  head.castShadow = true;
+  group.add(head);
+
+  // Helmet (enemy)
+  if (!isPlayer) {
+    const helmet = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.3, 12), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 1 }));
+    helmet.position.set(0, 2.35, 0);
+    group.add(helmet);
+  }
+
+  // Cape
+  const capeGeo = new THREE.PlaneGeometry(0.7, 1.1);
+  const capeMat = new THREE.MeshStandardMaterial({ color: isPlayer ? 0x1a2233 : 0x110000, side: THREE.DoubleSide });
+  const cape = new THREE.Mesh(capeGeo, capeMat);
+  cape.position.set(0, 1.15, -0.22);
+  group.add(cape);
+
+  // Arms
+  const armMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+  const rightArm = new THREE.Group();
+  const armMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), armMat);
+  armMesh.position.y = -0.4;
+  rightArm.add(armMesh);
+  rightArm.position.set(0.48, 1.9, 0.1);
+  group.add(rightArm);
+
+  // Legs
+  [-0.18, 0.18].forEach((x, i) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.9, 0.3), mat);
+    leg.position.set(x, 0.45, 0);
+    leg.castShadow = true;
+    group.add(leg);
+  });
+
+  return { group, rightArm };
+}
+
+// ─── GAME STATE ───────────────────────────────────────────────────────────────
+let gameState = 'playing'; // 'playing' | 'gameover'
+let playerHP = 100, enemyHP = 100;
+let score = 0, combo = 0, comboTimer = 0;
+let dodgeCooldown = 0, attackCooldown = 0, forceCooldown = 0;
+let playerPos = new THREE.Vector3(0, 0, 3);
+let playerVel = new THREE.Vector3();
+let enemyPos = new THREE.Vector3(0, 0, -3);
+let enemyPhase = 'idle'; // idle, approach, attack, dodge, stunned
+let enemyTimer = 0;
+let swingAngle = 0, swingActive = false;
+let enemySwingAngle = 0, enemySwingActive = false;
+let enemyAttackTimer = 0;
+let screenShake = 0;
+let particles = [];
+let isDodging = false, dodgeTimer = 0;
+let forceWave = null;
+
+// Build characters
+const { group: playerGroup, rightArm: playerArm } = createCharacter(true);
+scene.add(playerGroup);
+
+const { group: enemyGroup, rightArm: enemyArm } = createCharacter(false);
+scene.add(enemyGroup);
+
+// Build lightsabers
+const playerSaber = createLightsaber(0x2266ff, 0x0044ff);
+playerSaber.group.rotation.z = -0.5;
+playerArm.add(playerSaber.group);
+playerSaber.group.position.set(0, 0.5, 0);
+
+const enemySaber = createLightsaber(0xff2200, 0xff0000);
+enemySaber.group.rotation.z = 0.5;
+enemyArm.add(enemySaber.group);
+enemySaber.group.position.set(0, 0.5, 0);
+
+// ─── PARTICLES ───────────────────────────────────────────────────────────────
+function spawnSparks(position, color, count = 20) {
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(0.04, 4, 4);
+    const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 5 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(position);
+    scene.add(mesh);
+    const vel = new THREE.Vector3(
+      (Math.random()-0.5)*8,
+      Math.random()*6+2,
+      (Math.random()-0.5)*8
+    );
+    particles.push({ mesh, vel, life: 0.6 + Math.random()*0.4 });
+  }
+}
+
+function spawnForceWave(position, direction) {
+  const geo = new THREE.TorusGeometry(0.5, 0.1, 8, 32);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x66aaff, emissive: 0x66aaff, emissiveIntensity: 3, transparent: true, opacity: 0.8 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(position);
+  mesh.lookAt(position.clone().add(direction));
+  mesh.rotation.x += Math.PI/2;
+  scene.add(mesh);
+  forceWave = { mesh, vel: direction.clone().multiplyScalar(15), life: 1.0, mat };
+}
+
+// ─── INPUT ────────────────────────────────────────────────────────────────────
+const keys = {};
+const mouse = { x: 0, y: 0, clicked: false, rightClicked: false };
+
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+document.addEventListener('mousemove', e => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+});
+document.addEventListener('mousedown', e => {
+  if (gameState !== 'playing') return;
+  if (e.button === 0) mouse.clicked = true;
+  if (e.button === 2) mouse.rightClicked = true;
+  e.preventDefault();
+});
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// ─── UI HELPERS ───────────────────────────────────────────────────────────────
+function flashScreen(color, intensity = 0.5) {
+  const el = document.getElementById('screen-flash');
+  el.style.background = color;
+  el.style.opacity = intensity;
+  setTimeout(() => { el.style.opacity = 0; }, 100);
+}
+
+function showHitIndicator(text, color) {
+  const el = document.getElementById('hit-indicator');
+  el.style.color = color;
+  el.textContent = text;
+  el.style.opacity = 1;
+  setTimeout(() => { el.style.opacity = 0; }, 600);
+}
+
+function updateHUD() {
+  document.getElementById('player-health-bar').style.width = playerHP + '%';
+  document.getElementById('enemy-health-bar').style.width = enemyHP + '%';
+  document.getElementById('player-hp').textContent = Math.max(0, Math.round(playerHP));
+  document.getElementById('enemy-hp').textContent = Math.max(0, Math.round(enemyHP));
+  document.getElementById('score-display').textContent = String(Math.round(score)).padStart(3, '0');
+  if (combo >= 3) {
+    document.getElementById('combo-display').textContent = `✦ ${combo}x COMBO ✦`;
+  } else {
+    document.getElementById('combo-display').textContent = '';
+  }
+}
+
+// ─── ATTACK LOGIC ─────────────────────────────────────────────────────────────
+function playerAttack() {
+  if (attackCooldown > 0 || swingActive) return;
+  swingActive = true;
+  attackCooldown = 0.6;
+
+  // Check hit
+  const dist = playerPos.distanceTo(enemyPos);
+  if (dist < 4.5) {
+    // Hit!
+    const dmg = 8 + Math.random() * 5;
+    enemyHP = Math.max(0, enemyHP - dmg);
+    combo++;
+    comboTimer = 3;
+    score += Math.round(dmg * (1 + combo * 0.1));
+
+    const swordTip = playerGroup.position.clone().add(new THREE.Vector3(0.5, 2.5, -0.5));
+    spawnSparks(swordTip, 0xff8800, 15);
+    flashScreen('rgba(255, 100, 0, 0.3)', 0.3);
+
+    if (combo >= 5) showHitIndicator('MASTERY!', '#ffcc00');
+    else if (combo >= 3) showHitIndicator('COMBO!', '#ff8800');
+    else showHitIndicator('HIT!', '#ffffff');
+
+    if (enemyHP <= 0) triggerGameOver(true);
+  }
+}
+
+function playerForce() {
+  if (forceCooldown > 0) return;
+  forceCooldown = 3;
+  const dir = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
+  spawnForceWave(playerPos.clone().add(new THREE.Vector3(0, 1.5, 0)), dir);
+  showHitIndicator('FORCE PUSH!', '#66aaff');
+}
+
+function playerDodge() {
+  if (dodgeCooldown > 0) return;
+  isDodging = true;
+  dodgeTimer = 0.4;
+  dodgeCooldown = 1.5;
+}
+
+// ─── ENEMY AI ─────────────────────────────────────────────────────────────────
+function updateEnemy(dt) {
+  const dist = enemyPos.distanceTo(playerPos);
+  enemyTimer -= dt;
+
+  if (enemyPhase === 'stunned') {
+    if (enemyTimer <= 0) { enemyPhase = 'approach'; enemyTimer = 1; }
+    return;
+  }
+
+  if (enemyPhase === 'idle') {
+    if (enemyTimer <= 0) { enemyPhase = 'approach'; enemyTimer = 2; }
+  }
+
+  if (enemyPhase === 'approach') {
+    const dir = playerPos.clone().sub(enemyPos).normalize();
+    const targetDist = 3.5;
+    if (dist > targetDist) {
+      enemyPos.addScaledVector(dir, dt * (2 + score/500));
+    } else {
+      enemyPhase = 'attack';
+      enemyTimer = 0.3 + Math.random() * 0.5;
+    }
+  }
+
+  if (enemyPhase === 'attack') {
+    if (enemyTimer <= 0) {
+      // Enemy swings
+      if (!enemySwingActive) {
+        enemySwingActive = true;
+        const dist2 = enemyPos.distanceTo(playerPos);
+        if (dist2 < 4.5 && !isDodging) {
+          const dmg = 6 + Math.random() * 4;
+          playerHP = Math.max(0, playerHP - dmg);
+          combo = 0;
+          comboTimer = 0;
+          flashScreen('rgba(0, 100, 255, 0.4)', 0.4);
+          screenShake = 0.3;
+          spawnSparks(playerPos.clone().add(new THREE.Vector3(0, 1.5, 0)), 0x2266ff, 12);
+          if (playerHP <= 0) triggerGameOver(false);
+        }
+        enemyPhase = 'dodge';
+        enemyTimer = 0.5 + Math.random() * 1;
+      }
+    }
+  }
+
+  if (enemyPhase === 'dodge') {
+    if (enemyTimer <= 0) {
+      // Sidestep
+      const perp = new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize();
+      enemyPos.addScaledVector(perp, 2);
+      enemyPos.x = Math.max(-10, Math.min(10, enemyPos.x));
+      enemyPos.z = Math.max(-10, Math.min(10, enemyPos.z));
+      enemyPhase = 'approach';
+      enemyTimer = 0.5;
+    }
+  }
+
+  // Check force wave hit
+  if (forceWave) {
+    const wdist = forceWave.mesh.position.distanceTo(enemyPos);
+    if (wdist < 2) {
+      enemyPos.add(new THREE.Vector3((Math.random()-0.5)*4, 0, -3));
+      enemyHP = Math.max(0, enemyHP - 10);
+      enemyPhase = 'stunned';
+      enemyTimer = 1.5;
+      spawnSparks(enemyPos.clone().add(new THREE.Vector3(0,1,0)), 0x66aaff, 25);
+      scene.remove(forceWave.mesh);
+      forceWave = null;
+      if (enemyHP <= 0) triggerGameOver(true);
+    }
+  }
+}
+
+// ─── GAME OVER ───────────────────────────────────────────────────────────────
+function triggerGameOver(playerWon) {
+  gameState = 'gameover';
+  const el = document.getElementById('game-over');
+  const title = document.getElementById('game-over-title');
+  const subtitle = document.getElementById('game-over-subtitle');
+  if (playerWon) {
+    title.textContent = 'VICTORY';
+    title.style.color = '#0066ff';
+    title.style.textShadow = '0 0 40px #0066ff';
+    subtitle.textContent = `THE SITH IS DEFEATED • SCORE: ${Math.round(score)}`;
+  } else {
+    title.textContent = 'DEFEATED';
+    title.style.color = '#ff2200';
+    title.style.textShadow = '0 0 40px #ff2200';
+    subtitle.textContent = `THE DARK SIDE PREVAILS • SCORE: ${Math.round(score)}`;
+  }
+  el.classList.add('show');
+}
+
+function restartGame() {
+  playerHP = 100; enemyHP = 100;
+  score = 0; combo = 0; comboTimer = 0;
+  dodgeCooldown = 0; attackCooldown = 0; forceCooldown = 0;
+  playerPos.set(0, 0, 3);
+  enemyPos.set(0, 0, -3);
+  enemyPhase = 'idle'; enemyTimer = 1;
+  swingActive = false; enemySwingActive = false;
+  isDodging = false; forceWave = null;
+  screenShake = 0;
+  particles.forEach(p => scene.remove(p.mesh));
+  particles = [];
+  gameState = 'playing';
+  document.getElementById('game-over').classList.remove('show');
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let t = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  t += dt;
+
+  if (gameState !== 'playing') {
+    renderer.render(scene, camera);
+    return;
+  }
+
+  // Input
+  const moveSpeed = isDodging ? 12 : 5;
+  if (keys['KeyW'] || keys['ArrowUp'])    playerPos.z -= dt * moveSpeed;
+  if (keys['KeyS'] || keys['ArrowDown'])  playerPos.z += dt * moveSpeed;
+  if (keys['KeyA'] || keys['ArrowLeft'])  playerPos.x -= dt * moveSpeed;
+  if (keys['KeyD'] || keys['ArrowRight']) playerPos.x += dt * moveSpeed;
+
+  playerPos.x = Math.max(-10, Math.min(10, playerPos.x));
+  playerPos.z = Math.max(-2, Math.min(10, playerPos.z));
+
+  if (mouse.clicked) { playerAttack(); mouse.clicked = false; }
+  if (mouse.rightClicked) { playerForce(); mouse.rightClicked = false; }
+  if (keys['Space'] && !isDodging) { playerDodge(); keys['Space'] = false; }
+
+  // Cooldowns
+  attackCooldown = Math.max(0, attackCooldown - dt);
+  dodgeCooldown = Math.max(0, dodgeCooldown - dt);
+  forceCooldown = Math.max(0, forceCooldown - dt);
+  comboTimer -= dt;
+  if (comboTimer <= 0) { combo = 0; }
+
+  // Dodge
+  if (isDodging) {
+    dodgeTimer -= dt;
+    if (dodgeTimer <= 0) isDodging = false;
+  }
+
+  // Swing animation
+  if (swingActive) {
+    swingAngle += dt * 12;
+    if (swingAngle > Math.PI) { swingAngle = 0; swingActive = false; }
+  }
+  if (enemySwingActive) {
+    enemySwingAngle += dt * 10;
+    if (enemySwingAngle > Math.PI) { enemySwingAngle = 0; enemySwingActive = false; }
+  }
+
+  // Enemy
+  updateEnemy(dt);
+
+  // ─ Position characters
+  playerGroup.position.copy(playerPos);
+  enemyGroup.position.copy(enemyPos);
+
+  // Face each other
+  const lookDir = enemyPos.clone().sub(playerPos);
+  if (lookDir.length() > 0.1) {
+    playerGroup.rotation.y = Math.atan2(lookDir.x, lookDir.z);
+  }
+  const enemyLookDir = playerPos.clone().sub(enemyPos);
+  if (enemyLookDir.length() > 0.1) {
+    enemyGroup.rotation.y = Math.atan2(enemyLookDir.x, enemyLookDir.z);
+  }
+
+  // Body bob
+  const bobY = Math.sin(t * 3) * 0.05;
+  playerGroup.position.y = bobY;
+  enemyGroup.position.y = bobY * 0.7;
+
+  // Saber swing animation
+  playerArm.rotation.x = swingActive ? -swingAngle * 0.8 : Math.sin(t*2)*0.05;
+  enemyArm.rotation.x = enemySwingActive ? -enemySwingAngle * 0.8 : Math.sin(t*1.8+1)*0.05;
+
+  // Idle saber sway
+  playerSaber.group.rotation.z = -0.5 + Math.sin(t * 2) * 0.05;
+  enemySaber.group.rotation.z = 0.5 + Math.sin(t * 2.2 + 1) * 0.05;
+
+  // Saber flicker
+  const flicker = 0.95 + Math.random() * 0.1;
+  playerSaber.bladeMat.emissiveIntensity = 3 * flicker;
+  enemySaber.bladeMat.emissiveIntensity = 3 * flicker;
+  playerSaber.saberLight.intensity = 2 * flicker;
+  enemySaber.saberLight.intensity = 2 * flicker;
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    p.vel.y -= 15 * dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    p.mesh.scale.setScalar(p.life);
+    if (p.life <= 0) {
+      scene.remove(p.mesh);
+      particles.splice(i, 1);
+    }
+  }
+
+  // Force wave
+  if (forceWave) {
+    forceWave.life -= dt;
+    forceWave.mesh.position.addScaledVector(forceWave.vel, dt);
+    forceWave.mesh.scale.setScalar(1 + (1 - forceWave.life) * 3);
+    forceWave.mat.opacity = forceWave.life * 0.8;
+    if (forceWave.life <= 0) {
+      scene.remove(forceWave.mesh);
+      forceWave = null;
+    }
+  }
+
+  // Dynamic lights follow sabers
+  pointLight1.position.set(playerPos.x, 4, playerPos.z);
+  pointLight2.position.set(enemyPos.x, 4, enemyPos.z);
+
+  // Camera follow player
+  const targetCamX = playerPos.x * 0.3 + mouse.x * 2;
+  const targetCamZ = playerPos.z + 8;
+  camera.position.x += (targetCamX - camera.position.x) * dt * 4;
+  camera.position.z += (targetCamZ - camera.position.z) * dt * 4;
+  camera.position.y = 3.5;
+
+  // Screen shake
+  if (screenShake > 0) {
+    camera.position.x += (Math.random()-0.5) * screenShake;
+    camera.position.y += (Math.random()-0.5) * screenShake;
+    screenShake -= dt * 3;
+  }
+
+  camera.lookAt(
+    (playerPos.x + enemyPos.x) * 0.3,
+    1.5,
+    (playerPos.z + enemyPos.z) * 0.3
+  );
+
+  // Regen (very slow)
+  playerHP = Math.min(100, playerHP + dt * 0.5);
+
+  updateHUD();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+window.addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+});
+</script>
+</body>
+</html>
