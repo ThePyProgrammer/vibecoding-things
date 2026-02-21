@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIPS Architecture Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --bg: #050810;
+            --panel: #0a0f1e;
+            --border: #1a2a4a;
+            --accent: #00d4ff;
+            --accent2: #ff6b35;
+            --accent3: #39ff14;
+            --text: #c8d8f0;
+            --dim: #4a6080;
+            --hot: #ff3366;
+            --warn: #ffcc00;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: var(--panel);
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 1.1rem;
+            color: var(--accent);
+            letter-spacing: 3px;
+            text-shadow: 0 0 20px var(--accent);
+        }
+
+        .main {
+            display: grid;
+            grid-template-columns: 320px 1fr 280px;
+            grid-template-rows: 1fr;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        .panel {
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: var(--dim);
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--border);
+            text-transform: uppercase;
+        }
+
+        /* LEFT PANEL - Input + Encoding */
+        .input-area {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .input-area textarea {
+            width: 100%;
+            background: #030508;
+            border: 1px solid var(--border);
+            color: var(--accent3);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            padding: 8px;
+            resize: none;
+            height: 90px;
+            outline: none;
+            border-radius: 2px;
+            line-height: 1.6;
+        }
+
+        .input-area textarea:focus {
+            border-color: var(--accent);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        button {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            padding: 6px 12px;
+            border: 1px solid var(--accent);
+            background: transparent;
+            color: var(--accent);
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: var(--bg);
+        }
+
+        button.run {
+            border-color: var(--accent3);
+            color: var(--accent3);
+        }
+
+        button.run:hover {
+            background: var(--accent3);
+            color: var(--bg);
+        }
+
+        .encoding-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .instr-card {
+            background: #030812;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .instr-card:hover,
+        .instr-card.active {
+            border-color: var(--accent);
+        }
+
+        .instr-card.active {
+            background: #071220;
+        }
+
+        .instr-text {
+            color: var(--accent3);
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+        }
+
+        .instr-type {
+            font-size: 0.65rem;
+            color: var(--accent2);
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+
+        .binary-display {
+            font-size: 0.7rem;
+            line-height: 1.8;
+        }
+
+        .bit-group {
+            display: inline-block;
+            margin-right: 4px;
+            margin-bottom: 2px;
+        }
+
+        .bit-label {
+            font-size: 0.55rem;
+            color: var(--dim);
+            display: block;
+            text-align: center;
+        }
+
+        .bits {
+            display: flex;
+            gap: 1px;
+        }
+
+        .bit {
+            width: 11px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            border-radius: 1px;
+            transition: all 0.3s;
+        }
+
+        .bit-0 {
+            background: #0a1020;
+            color: var(--dim);
+        }
+
+        .bit-1 {
+            background: #002244;
+            color: var(--accent);
+            text-shadow: 0 0 4px var(--accent);
+        }
+
+        .field-op {
+            --fc: #ff6b35;
+        }
+
+        .field-rs {
+            --fc: #00d4ff;
+        }
+
+        .field-rt {
+            --fc: #39ff14;
+        }
+
+        .field-rd {
+            --fc: #ff3366;
+        }
+
+        .field-shamt {
+            --fc: #ffcc00;
+        }
+
+        .field-funct {
+            --fc: #cc88ff;
+        }
+
+        .field-imm {
+            --fc: #ff9944;
+        }
+
+        .field-target {
+            --fc: #44ffcc;
+        }
+
+        .bit-1.field-op {
+            background: #331400;
+            color: var(--accent2);
+        }
+
+        .bit-1.field-rs {
+            background: #002233;
+            color: var(--accent);
+        }
+
+        .bit-1.field-rt {
+            background: #003300;
+            color: var(--accent3);
+        }
+
+        .bit-1.field-rd {
+            background: #330011;
+            color: var(--hot);
+        }
+
+        .bit-1.field-funct {
+            background: #220033;
+            color: #cc88ff;
+        }
+
+        .bit-1.field-imm {
+            background: #332200;
+            color: #ff9944;
+        }
+
+        .bit-1.field-target {
+            background: #003322;
+            color: #44ffcc;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 6px 10px;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .legend-item {
+            font-size: 0.6rem;
+            padding: 2px 5px;
+            border-radius: 2px;
+        }
+
+        /* CENTER - Three.js canvas */
+        #canvas-container {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #three-canvas {
+            display: block;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            pointer-events: none;
+        }
+
+        .stage-display {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            color: var(--accent);
+            text-shadow: 0 0 10px var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .signal-log {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+            background: rgba(5, 8, 16, 0.85);
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+        }
+
+        .log-entry {
+            font-size: 0.7rem;
+            color: var(--dim);
+            line-height: 1.6;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .log-entry.hot {
+            color: var(--accent);
+        }
+
+        .log-entry.warn {
+            color: var(--warn);
+        }
+
+        .log-entry.done {
+            color: var(--accent3);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        /* RIGHT PANEL - Registers + Memory */
+        .right-panel {
+            border-right: none;
+            border-left: 1px solid var(--border);
+        }
+
+        .reg-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+            padding: 8px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .reg-cell {
+            background: #030812;
+            border: 1px solid #0d1a30;
+            padding: 4px 6px;
+            border-radius: 1px;
+            transition: all 0.4s;
+        }
+
+        .reg-cell.changed {
+            border-color: var(--accent3);
+            background: #011a05;
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(57, 255, 20, 0.6);
+            }
+
+            100% {
+                box-shadow: 0 0 0 6px rgba(57, 255, 20, 0);
+            }
+        }
+
+        .reg-name {
+            font-size: 0.6rem;
+            color: var(--dim);
+        }
+
+        .reg-val {
+            font-size: 0.8rem;
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .pc-display {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pc-label {
+            font-size: 0.65rem;
+            color: var(--dim);
+        }
+
+        .pc-val {
+            color: var(--accent2);
+            font-size: 0.9rem;
+        }
+
+        .mem-section {
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .mem-row {
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-bottom: 1px solid #080f1a;
+            transition: background 0.4s;
+        }
+
+        .mem-row.changed {
+            background: #011205;
+        }
+
+        .mem-addr {
+            color: var(--dim);
+        }
+
+        .mem-val {
+            color: var(--text);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+
+        .controls-bar {
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            font-size: 0.7rem;
+            color: var(--dim);
+        }
+
+        .speed-label {
+            margin-left: 8px;
+        }
+
+        input[type=range] {
+            width: 80px;
+            accent-color: var(--accent);
+        }
+
+        .instr-counter {
+            margin-left: auto;
+            color: var(--accent);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(5, 8, 16, 0.95);
+            border: 1px solid var(--accent);
+            padding: 6px 10px;
+            font-size: 0.7rem;
+            pointer-events: none;
+            display: none;
+            z-index: 100;
+            max-width: 200px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>MIPS ARCHITECTURE SIMULATOR</h1>
+        <span style="font-size:0.7rem;color:var(--dim)">32-BIT DATAPATH VISUALIZATION</span>
+        <span style="margin-left:auto;font-size:0.65rem;color:var(--dim)">DRAG TO ROTATE · SCROLL TO ZOOM</span>
+    </header>
+
+    <div class="main">
+        <!-- LEFT PANEL -->
+        <div class="panel">
+            <div class="panel-title">▸ INSTRUCTION INPUT & ENCODING</div>
+            <div class="input-area">
+                <textarea id="code-input" placeholder="Enter MIPS instructions...
+e.g.:
+add $t0, $t1, $t2
+sub $s0, $t0, $t1
+lw $t3, 4($s0)
+sw $t0, 8($s1)
+beq $t0, $t1, 2
+addi $t0, $zero, 42
+ori $s1, $s0, 15
+j 100"></textarea>
+                <div class="btn-row">
+                    <button onclick="parseInstructions()">ASSEMBLE</button>
+                    <button class="run" onclick="runAll()">▶ RUN ALL</button>
+                    <button onclick="stepExec()">STEP ▷</button>
+                    <button onclick="resetSim()" style="border-color:var(--hot);color:var(--hot)">RESET</button>
+                </div>
+            </div>
+            <div class="legend">
+                <span class="legend-item" style="background:#331400;color:#ff6b35">opcode</span>
+                <span class="legend-item" style="background:#002233;color:#00d4ff">rs</span>
+                <span class="legend-item" style="background:#003300;color:#39ff14">rt</span>
+                <span class="legend-item" style="background:#330011;color:#ff3366">rd</span>
+                <span class="legend-item" style="background:#002244;color:#aaa">shamt</span>
+                <span class="legend-item" style="background:#220033;color:#cc88ff">funct</span>
+                <span class="legend-item" style="background:#332200;color:#ff9944">imm/offset</span>
+            </div>
+            <div class="encoding-section" id="encoding-section">
+                <div style="color:var(--dim);font-size:0.75rem;text-align:center;margin-top:20px">
+                    Enter instructions above and click ASSEMBLE
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER - 3D Canvas -->
+        <div id="canvas-container">
+            <canvas id="three-canvas"></canvas>
+            <div class="canvas-overlay">
+                <div class="stage-display" id="stage-display">MIPS DATAPATH — 3D VIEW</div>
+            </div>
+            <div class="signal-log" id="signal-log"></div>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="panel right-panel">
+            <div class="panel-title">▸ CPU STATE</div>
+            <div class="pc-display">
+                <span class="pc-label">PROGRAM COUNTER</span>
+                <span class="pc-val" id="pc-val">0x00000000</span>
+            </div>
+            <div class="controls-bar">
+                <span>SPEED</span>
+                <input type="range" id="speed-slider" min="200" max="2000" value="800" step="100"
+                    oninput="simSpeed=parseInt(this.value)">
+                <span class="instr-counter" id="instr-counter">PC: 0</span>
+            </div>
+            <div class="panel-title">REGISTERS</div>
+            <div class="reg-grid" id="reg-grid"></div>
+            <div class="mem-section">
+                <div class="panel-title">DATA MEMORY (word-addressed)</div>
+                <div id="mem-display"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================
+        // MIPS ASSEMBLER & SIMULATOR
+        // =====================================================
+
+        const REG_NAMES = [
+            '$zero', '$at', '$v0', '$v1', '$a0', '$a1', '$a2', '$a3',
+            '$t0', '$t1', '$t2', '$t3', '$t4', '$t5', '$t6', '$t7',
+            '$s0', '$s1', '$s2', '$s3', '$s4', '$s5', '$s6', '$s7',
+            '$t8', '$t9', '$k0', '$k1', '$gp', '$sp', '$fp', '$ra'
+        ];
+
+        const REG_ALIAS = {};
+        REG_NAMES.forEach((n, i) => { REG_ALIAS[n] = i; REG_ALIAS[`$${i}`] = i; });
+        REG_ALIAS['$zero'] = 0; REG_ALIAS['$0'] = 0;
+
+        const FUNCT = { add: 0x20, sub: 0x22, and: 0x24, or: 0x25, slt: 0x2a, nor: 0x27, sll: 0x00, srl: 0x02, jr: 0x08, mul: 0x18 };
+        const OPCODE = { addi: 0x08, addiu: 0x09, andi: 0x0c, ori: 0x0d, slti: 0x0a, lw: 0x23, sw: 0x2b, beq: 0x04, bne: 0x05, lui: 0x0f, j: 0x02, jal: 0x03 };
+
+        let instructions = [];
+        let registers = new Int32Array(32);
+        let memory = {};
+        let pc = 0;
+        let currentInstrIdx = -1;
+        let simSpeed = 800;
+        let runInterval = null;
+        let logs = [];
+
+        function regNum(s) {
+            s = s.trim().replace(',', '');
+            if (s in REG_ALIAS) return REG_ALIAS[s];
+            const n = parseInt(s);
+            if (!isNaN(n)) return n;
+            return 0;
+        }
+
+        function encodeInstruction(line) {
+            line = line.trim().replace(/,/g, ' ').replace(/\s+/g, ' ');
+            if (!line || line.startsWith('#')) return null;
+            const parts = line.split(' ').filter(p => p);
+            const op = parts[0].toLowerCase();
+
+            // R-type
+            if (['add', 'sub', 'and', 'or', 'slt', 'nor', 'mul'].includes(op)) {
+                const rd = regNum(parts[1]), rs = regNum(parts[2]), rt = regNum(parts[3]);
+                const funct = FUNCT[op] || 0;
+                const bin32 = (0 << 26) | (rs << 21) | (rt << 16) | (rd << 11) | (0 << 6) | funct;
+                return { type: 'R', op, rd, rs, rt, shamt: 0, funct, bin32, text: line, fields: { opcode: 6, rs: 5, rt: 5, rd: 5, shamt: 5, funct: 6 } };
+            }
+            if (op === 'sll' || op === 'srl') {
+                const rd = regNum(parts[1]), rt = regNum(parts[2]), shamt = parseInt(parts[3]) || 0;
+                const funct = FUNCT[op];
+                const bin32 = (0 << 26) | (0 << 21) | (rt << 16) | (rd << 11) | (shamt << 6) | funct;
+                return { type: 'R', op, rd, rs: 0, rt, shamt, funct, bin32, text: line, fields: { opcode: 6, rs: 5, rt: 5, rd: 5, shamt: 5, funct: 6 } };
+            }
+            if (op === 'jr') {
+                const rs = regNum(parts[1]);
+                const bin32 = (0 << 26) | (rs << 21) | (0) | (FUNCT.jr);
+                return { type: 'R', op, rd: 0, rs, rt: 0, shamt: 0, funct: FUNCT.jr, bin32, text: line, fields: { opcode: 6, rs: 5, rt: 5, rd: 5, shamt: 5, funct: 6 } };
+            }
+
+            // I-type
+            if (['addi', 'addiu', 'andi', 'ori', 'slti'].includes(op)) {
+                const rt = regNum(parts[1]), rs = regNum(parts[2]), imm = parseInt(parts[3]) || 0;
+                const opcode = OPCODE[op];
+                const bin32 = (opcode << 26) | (rs << 21) | (rt << 16) | ((imm & 0xffff));
+                return { type: 'I', op, rt, rs, imm, bin32, text: line, fields: { opcode: 6, rs: 5, rt: 5, imm: 16 } };
+            }
+            if (op === 'lui') {
+                const rt = regNum(parts[1]), imm = parseInt(parts[2]) || 0;
+                const bin32 = (OPCODE.lui << 26) | (0 << 21) | (rt << 16) | ((imm & 0xffff));
+                return { type: 'I', op, rt, rs: 0, imm, bin32, text: line, fields: { opcode: 6, rs: 5, rt: 5, imm: 16 } };
+            }
+            if (op === 'lw' || op === 'sw') {
+                // e.g. lw $t0, 4($s0)
+                const rt = regNum(parts[1]);
+                const m = parts[2] && parts[2].match(/(-?\d+)\((.+)\)/);
+                const offset = m ? parseInt(m[1]) : 0, rs = m ? regNum(m[2]) : 0;
+                const opcode = OPCODE[op];
+                const bin32 = (opcode << 26) | (rs << 21) | (rt << 16) | ((offset & 0xffff));
+                return { type: 'I', op, rt, rs, imm: offset, bin32, text: line, fields: { opcode: 6, rs: 5, rt: 5, imm: 16 } };
+            }
+            if (op === 'beq' || op === 'bne') {
+                const rs = regNum(parts[1]), rt = regNum(parts[2]), offset = parseInt(parts[3]) || 0;
+                const opcode = OPCODE[op];
+                const bin32 = (opcode << 26) | (rs << 21) | (rt << 16) | ((offset & 0xffff));
+                return { type: 'I', op, rs, rt, imm: offset, bin32, text: line, fields: { opcode: 6, rs: 5, rt: 5, imm: 16 } };
+            }
+
+            // J-type
+            if (op === 'j' || op === 'jal') {
+                const target = parseInt(parts[1]) || 0;
+                const opcode = OPCODE[op];
+                const bin32 = (opcode << 26) | (target & 0x3ffffff);
+                return { type: 'J', op, target, bin32, text: line, fields: { opcode: 6, target: 26 } };
+            }
+
+            return { type: '?', op, bin32: 0, text: line, fields: { opcode: 6, rest: 26 } };
+        }
+
+        function toBinary(n, bits) {
+            if (n < 0) n = n >>> 0;
+            return (n >>> 0).toString(2).padStart(32, '0').slice(32 - bits);
+        }
+
+        function parseInstructions() {
+            const code = document.getElementById('code-input').value;
+            instructions = [];
+            const lines = code.split('\n');
+            lines.forEach(l => {
+                const enc = encodeInstruction(l.trim());
+                if (enc) instructions.push(enc);
+            });
+            renderEncodings();
+            resetSim();
+        }
+
+        function renderEncodings() {
+            const sec = document.getElementById('encoding-section');
+            sec.innerHTML = '';
+            instructions.forEach((instr, idx) => {
+                const card = document.createElement('div');
+                card.className = 'instr-card';
+                card.id = `icard-${idx}`;
+                card.onclick = () => selectInstr(idx);
+
+                let html = `<div class="instr-text">${instr.text}</div>`;
+                html += `<div class="instr-type">${instr.type}-TYPE &nbsp; op:${instr.op.toUpperCase()}</div>`;
+                html += `<div class="binary-display">`;
+
+                // Render field groups
+                const bin = toBinary(instr.bin32, 32);
+                if (instr.type === 'R') {
+                    const groups = [
+                        { label: 'opcode', bits: 6, cls: 'field-op' },
+                        { label: 'rs', bits: 5, cls: 'field-rs' },
+                        { label: 'rt', bits: 5, cls: 'field-rt' },
+                        { label: 'rd', bits: 5, cls: 'field-rd' },
+                        { label: 'shamt', bits: 5, cls: 'field-shamt' },
+                        { label: 'funct', bits: 6, cls: 'field-funct' },
+                    ];
+                    let pos = 0;
+                    groups.forEach(g => {
+                        html += `<div class="bit-group">`;
+                        html += `<span class="bit-label">${g.label}</span>`;
+                        html += `<div class="bits">`;
+                        for (let i = 0; i < g.bits; i++) {
+                            const b = bin[pos + i];
+                            html += `<div class="bit bit-${b} ${g.cls}">${b}</div>`;
+                        }
+                        html += `</div></div>`;
+                        pos += g.bits;
+                    });
+                } else if (instr.type === 'I') {
+                    const groups = [
+                        { label: 'opcode', bits: 6, cls: 'field-op' },
+                        { label: 'rs', bits: 5, cls: 'field-rs' },
+                        { label: 'rt', bits: 5, cls: 'field-rt' },
+                        { label: 'imm/offset', bits: 16, cls: 'field-imm' },
+                    ];
+                    let pos = 0;
+                    groups.forEach(g => {
+                        html += `<div class="bit-group">`;
+                        html += `<span class="bit-label">${g.label}</span>`;
+                        html += `<div class="bits">`;
+                        for (let i = 0; i < g.bits; i++) {
+                            const b = bin[pos + i];
+                            html += `<div class="bit bit-${b} ${g.cls}">${b}</div>`;
+                        }
+                        html += `</div></div>`;
+                        pos += g.bits;
+                    });
+                } else {
+                    const groups = [
+                        { label: 'opcode', bits: 6, cls: 'field-op' },
+                        { label: 'target', bits: 26, cls: 'field-target' },
+                    ];
+                    let pos = 0;
+                    groups.forEach(g => {
+                        html += `<div class="bit-group">`;
+                        html += `<span class="bit-label">${g.label}</span>`;
+                        html += `<div class="bits">`;
+                        for (let i = 0; i < g.bits; i++) {
+                            const b = bin[pos + i];
+                            html += `<div class="bit bit-${b} ${g.cls}">${b}</div>`;
+                        }
+                        html += `</div></div>`;
+                        pos += g.bits;
+                    });
+                }
+
+                html += `</div>`;
+                html += `<div style="font-size:0.65rem;color:var(--dim);margin-top:4px">0x${((instr.bin32) >>> 0).toString(16).padStart(8, '0').toUpperCase()}</div>`;
+                card.innerHTML = html;
+                sec.appendChild(card);
+            });
+        }
+
+        function selectInstr(idx) {
+            document.querySelectorAll('.instr-card').forEach(c => c.classList.remove('active'));
+            const card = document.getElementById(`icard-${idx}`);
+            if (card) { card.classList.add('active'); card.scrollIntoView({ block: 'nearest' }); }
+            currentInstrIdx = idx;
+            animateInstruction(instructions[idx]);
+        }
+
+        function resetSim() {
+            if (runInterval) { clearInterval(runInterval); runInterval = null; }
+            registers = new Int32Array(32);
+            memory = {};
+            pc = 0;
+            currentInstrIdx = -1;
+            document.getElementById('pc-val').textContent = '0x00000000';
+            document.getElementById('instr-counter').textContent = 'PC: 0';
+            renderRegisters(null);
+            renderMemory(null);
+            document.getElementById('signal-log').innerHTML = '';
+            logs = [];
+            document.getElementById('stage-display').textContent = 'MIPS DATAPATH — READY';
+            document.querySelectorAll('.instr-card').forEach(c => c.classList.remove('active'));
+            resetSignals();
+        }
+
+        function stepExec() {
+            if (!instructions.length) { parseInstructions(); return; }
+            if (pc >= instructions.length) { addLog('▸ END OF PROGRAM', 'done'); return; }
+            executeInstruction(pc);
+            pc++;
+            document.getElementById('pc-val').textContent = '0x' + (pc * 4).toString(16).padStart(8, '0').toUpperCase();
+            document.getElementById('instr-counter').textContent = `PC: ${pc * 4}`;
+        }
+
+        function runAll() {
+            if (!instructions.length) { parseInstructions(); return; }
+            if (runInterval) { clearInterval(runInterval); runInterval = null; return; }
+            runInterval = setInterval(() => {
+                if (pc >= instructions.length) {
+                    clearInterval(runInterval); runInterval = null;
+                    addLog('▸ PROGRAM COMPLETE', 'done');
+                    return;
+                }
+                stepExec();
+            }, simSpeed);
+        }
+
+        function executeInstruction(instrPc) {
+            const instr = instructions[instrPc];
+            if (!instr) return;
+            selectInstr(instrPc);
+
+            let changedRegs = new Set();
+            let changedMem = null;
+            const op = instr.op.toLowerCase();
+
+            addLog(`▸ IF: Fetch [${instr.text}]`, 'hot');
+            addLog(`  ID: Decode opcode=0x${((instr.bin32 >>> 26) & 0x3f).toString(16)}`, '');
+
+            // Execute
+            if (instr.type === 'R') {
+                const rs = registers[instr.rs], rt = registers[instr.rt];
+                addLog(`  EX: ALU ${op} $${instr.rs}(${rs}) op $${instr.rt}(${rt})`, '');
+                let result;
+                if (op === 'add' || op === 'addu') result = rs + rt;
+                else if (op === 'sub' || op === 'subu') result = rs - rt;
+                else if (op === 'and') result = rs & rt;
+                else if (op === 'or') result = rs | rt;
+                else if (op === 'nor') result = ~(rs | rt);
+                else if (op === 'slt') result = (rs < rt) ? 1 : 0;
+                else if (op === 'sll') result = registers[instr.rt] << instr.shamt;
+                else if (op === 'srl') result = registers[instr.rt] >>> instr.shamt;
+                else if (op === 'jr') { pc = registers[instr.rs] / 4 - 1; addLog(`  WB: Jump to 0x${(registers[instr.rs]).toString(16)}`, 'warn'); return; }
+                else if (op === 'mul') result = rs * rt;
+                else result = 0;
+                if (instr.rd !== 0) { registers[instr.rd] = result; changedRegs.add(instr.rd); }
+                addLog(`  WB: $${REG_NAMES[instr.rd]} ← ${result}`, 'done');
+            } else if (instr.type === 'I') {
+                const rs = registers[instr.rs], imm = instr.imm;
+                if (op === 'addi' || op === 'addiu') { registers[instr.rt] = rs + imm; changedRegs.add(instr.rt); addLog(`  EX/WB: $${REG_NAMES[instr.rt]} ← ${rs}+${imm}=${registers[instr.rt]}`, 'done'); }
+                else if (op === 'andi') { registers[instr.rt] = rs & imm; changedRegs.add(instr.rt); addLog(`  WB: $${REG_NAMES[instr.rt]} ← ${registers[instr.rt]}`, 'done'); }
+                else if (op === 'ori') { registers[instr.rt] = rs | imm; changedRegs.add(instr.rt); addLog(`  WB: $${REG_NAMES[instr.rt]} ← ${registers[instr.rt]}`, 'done'); }
+                else if (op === 'slti') { registers[instr.rt] = (rs < imm) ? 1 : 0; changedRegs.add(instr.rt); addLog(`  WB: $${REG_NAMES[instr.rt]} ← ${registers[instr.rt]}`, 'done'); }
+                else if (op === 'lui') { registers[instr.rt] = imm << 16; changedRegs.add(instr.rt); addLog(`  WB: $${REG_NAMES[instr.rt]} ← ${registers[instr.rt]}`, 'done'); }
+                else if (op === 'lw') {
+                    const addr = rs + imm; const wordAddr = Math.floor(addr / 4);
+                    addLog(`  MEM: Load from addr ${addr}`, 'warn');
+                    registers[instr.rt] = memory[wordAddr] || 0; changedRegs.add(instr.rt);
+                    addLog(`  WB: $${REG_NAMES[instr.rt]} ← ${registers[instr.rt]}`, 'done');
+                }
+                else if (op === 'sw') {
+                    const addr = rs + imm; const wordAddr = Math.floor(addr / 4);
+                    memory[wordAddr] = registers[instr.rt]; changedMem = wordAddr;
+                    addLog(`  MEM: Store $${REG_NAMES[instr.rt]}=${registers[instr.rt]} → addr ${addr}`, 'warn');
+                }
+                else if (op === 'beq') {
+                    const taken = registers[instr.rs] === registers[instr.rt];
+                    addLog(`  EX: ${REG_NAMES[instr.rs]}(${registers[instr.rs]})==${REG_NAMES[instr.rt]}(${registers[instr.rt]})? ${taken}`, 'warn');
+                    if (taken) { pc += imm; addLog(`  Branch taken → PC+4+${imm * 4}`, 'done'); }
+                }
+                else if (op === 'bne') {
+                    const taken = registers[instr.rs] !== registers[instr.rt];
+                    if (taken) pc += imm;
+                    addLog(`  ${taken ? 'Branch taken' : 'Not taken'}`, 'warn');
+                }
+            } else if (instr.type === 'J') {
+                if (op === 'j') { pc = instr.target - 1; addLog(`  Jump → ${instr.target}`, 'warn'); }
+                if (op === 'jal') { registers[31] = pc * 4 + 8; changedRegs.add(31); pc = instr.target - 1; addLog(`  JAL → ${instr.target}, $ra=${registers[31]}`, 'warn'); }
+            }
+
+            registers[0] = 0; // $zero always 0
+            renderRegisters(changedRegs);
+            renderMemory(changedMem);
+            animateSignals(instr, changedRegs, changedMem);
+        }
+
+        function addLog(msg, cls = '') {
+            const log = document.getElementById('signal-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${cls}`;
+            entry.textContent = msg;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            if (log.children.length > 50) log.removeChild(log.firstChild);
+        }
+
+        function renderRegisters(changed) {
+            const grid = document.getElementById('reg-grid');
+            grid.innerHTML = '';
+            REG_NAMES.forEach((name, i) => {
+                const cell = document.createElement('div');
+                cell.className = 'reg-cell' + (changed && changed.has(i) ? ' changed' : '');
+                cell.innerHTML = `<div class="reg-name">${name}</div><div class="reg-val">${registers[i]}</div>`;
+                grid.appendChild(cell);
+            });
+        }
+
+        function renderMemory(changed) {
+            const mem = document.getElementById('mem-display');
+            const entries = Object.keys(memory);
+            if (!entries.length) { mem.innerHTML = '<div style="padding:6px 8px;font-size:0.7rem;color:var(--dim)">empty</div>'; return; }
+            mem.innerHTML = '';
+            entries.sort((a, b) => a - b).forEach(addr => {
+                const row = document.createElement('div');
+                row.className = 'mem-row' + (changed != null && parseInt(addr) === changed ? ' changed' : '');
+                row.innerHTML = `<span class="mem-addr">0x${(parseInt(addr) * 4).toString(16).padStart(4, '0')}</span><span class="mem-val">${memory[addr]}</span>`;
+                mem.appendChild(row);
+            });
+        }
+
+        // =====================================================
+        // THREE.JS 3D DATAPATH
+        // =====================================================
+
+        let scene, camera, renderer, animFrame;
+        let nodes = {};
+        let wires = [];
+        let activeParticles = [];
+        let clock;
+
+        function initThree() {
+            const canvas = document.getElementById('three-canvas');
+            const container = document.getElementById('canvas-container');
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = false;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050810);
+            scene.fog = new THREE.FogExp2(0x050810, 0.035);
+
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 200);
+            camera.position.set(0, 8, 18);
+            camera.lookAt(0, 0, 0);
+
+            clock = new THREE.Clock();
+
+            // Lighting
+            const ambient = new THREE.AmbientLight(0x0a1428, 3);
+            scene.add(ambient);
+            const pt1 = new THREE.PointLight(0x00d4ff, 2, 30);
+            pt1.position.set(-5, 8, 5);
+            scene.add(pt1);
+            const pt2 = new THREE.PointLight(0xff6b35, 1.5, 20);
+            pt2.position.set(6, 4, -2);
+            scene.add(pt2);
+
+            buildDatapath();
+            buildGridFloor();
+            setupControls();
+
+            animate();
+
+            window.addEventListener('resize', () => {
+                const w = container.clientWidth, h = container.clientHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            });
+        }
+
+        function makeNode(name, pos, color, size = 1, label = '') {
+            const geo = new THREE.BoxGeometry(size, size * 0.6, size);
+            const mat = new THREE.MeshPhongMaterial({
+                color: new THREE.Color(color),
+                transparent: true,
+                opacity: 0.85,
+                emissive: new THREE.Color(color),
+                emissiveIntensity: 0.15,
+                wireframe: false,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(...pos);
+
+            // Wireframe overlay
+            const wfGeo = new THREE.EdgesGeometry(geo);
+            const wfMat = new THREE.LineBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.6 });
+            const wf = new THREE.LineSegments(wfGeo, wfMat);
+            mesh.add(wf);
+
+            // Label via sprite
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'transparent';
+            ctx.font = 'bold 22px Share Tech Mono, monospace';
+            ctx.fillStyle = '#' + new THREE.Color(color).getHexString();
+            ctx.textAlign = 'center';
+            ctx.fillText(label || name, 128, 40);
+            const tex = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(2.5, 0.6, 1);
+            sprite.position.set(0, size * 0.5, 0);
+            mesh.add(sprite);
+
+            scene.add(mesh);
+            nodes[name] = { mesh, mat, pos, color, baseIntensity: 0.15 };
+            return mesh;
+        }
+
+        function makeTube(from, to, color) {
+            const start = new THREE.Vector3(...from);
+            const end = new THREE.Vector3(...to);
+            const mid = new THREE.Vector3().lerpVectors(start, end, 0.5);
+            mid.y += 0.3;
+            const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+            const geo = new THREE.TubeGeometry(curve, 20, 0.04, 6, false);
+            const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.3 });
+            const tube = new THREE.Mesh(geo, mat);
+            scene.add(tube);
+            return { tube, mat, curve, start, end, color };
+        }
+
+        function buildDatapath() {
+            // Component layout in 3D
+            // Row 0 (back): PC, Instruction Memory
+            // Row 1 (mid): Register File, ALU, Data Memory
+            // Row 2 (front): MUXes, Control unit
+
+            const n = makeNode;
+
+            // PC
+            n('PC', [-8, 0, 4], '#00d4ff', 1.2, 'PC');
+            // IF/ID
+            n('IMEM', [-5, 0, 2], '#0055aa', 1.8, 'INSTR MEM');
+            // Control
+            n('CTRL', [-2, 3, 0], '#ff6b35', 1.4, 'CONTROL');
+            // Register File
+            n('REGFILE', [-1, 0, 1], '#39ff14', 2.5, 'REG FILE');
+            // Sign Extend
+            n('SEXT', [-1, -2, 1], '#888800', 1.2, 'SIGN EXT');
+            // ALU MUX (selects reg/imm)
+            n('MUX_ALU', [3, 0, 1], '#cc88ff', 0.8, 'MUX');
+            // ALU
+            n('ALU', [5, 0, 1], '#ff3366', 2, 'ALU');
+            // Data Memory
+            n('DMEM', [8, 0, 1], '#ff9944', 2, 'DATA MEM');
+            // WB MUX (selects ALU/MEM)
+            n('MUX_WB', [10, 0, 2], '#44ffcc', 0.8, 'MUX WB');
+            // Branch adder
+            n('BADDER', [2, 3, -1], '#ffcc00', 1, 'BR ADDER');
+            // PC+4 adder
+            n('ADDER4', [-6, 3, 4], '#00aaff', 1, 'PC+4');
+            // Jump MUX
+            n('MUX_PC', [-9, 2, 4], '#ff88aa', 0.8, 'MUX PC');
+
+            // Wires
+            const wc = (from, to, color) => { wires.push(makeTube(from, to, color)); };
+
+            wc([-8, 0, 4], [-6, 3, 4], '#00d4ff'); // PC -> PC+4
+            wc([-8, 0, 4], [-5, 0, 2], '#00d4ff'); // PC -> IMEM
+            wc([-5, 0, 2], [-2, 3, 0], '#ff6b35'); // IMEM -> CTRL
+            wc([-5, 0, 2], [-1, 0, 1], '#39ff14'); // IMEM -> REGFILE
+            wc([-5, 0, 2], [-1, -2, 1], '#888800'); // IMEM -> SEXT
+            wc([-1, 0, 1], [3, 0, 1], '#39ff14'); // REGFILE -> MUX_ALU
+            wc([-1, -2, 1], [3, 0, 1], '#888800'); // SEXT -> MUX_ALU
+            wc([3, 0, 1], [5, 0, 1], '#cc88ff'); // MUX_ALU -> ALU
+            wc([-1, 0, 1], [5, 0, 1], '#39ff14'); // REGFILE (rs) -> ALU
+            wc([5, 0, 1], [8, 0, 1], '#ff3366'); // ALU -> DMEM
+            wc([8, 0, 1], [10, 0, 2], '#ff9944'); // DMEM -> MUX_WB
+            wc([5, 0, 1], [10, 0, 2], '#ff3366'); // ALU -> MUX_WB
+            wc([10, 0, 2], [-1, 0, 1], '#44ffcc'); // WB -> REGFILE (loop)
+            wc([-1, -2, 1], [2, 3, -1], '#888800'); // SEXT -> BR ADDER
+            wc([-6, 3, 4], [2, 3, -1], '#00aaff'); // PC+4 -> BR ADDER
+        }
+
+        function buildGridFloor() {
+            const size = 40, divisions = 40;
+            const grid = new THREE.GridHelper(size, divisions, 0x0a1428, 0x0a1428);
+            grid.position.y = -2.5;
+            scene.add(grid);
+        }
+
+        function resetSignals() {
+            Object.values(nodes).forEach(n => {
+                n.mat.emissiveIntensity = n.baseIntensity;
+                n.mat.opacity = 0.85;
+            });
+            wires.forEach(w => { w.mat.opacity = 0.3; });
+            activeParticles.forEach(p => scene.remove(p.mesh));
+            activeParticles = [];
+        }
+
+        function highlightNode(name, intensity = 1, duration = 1200) {
+            const node = nodes[name];
+            if (!node) return;
+            node.mat.emissiveIntensity = intensity;
+            node.mat.opacity = 1;
+            setTimeout(() => {
+                node.mat.emissiveIntensity = node.baseIntensity;
+                node.mat.opacity = 0.85;
+            }, duration);
+        }
+
+        function spawnParticle(wire, color) {
+            const geo = new THREE.SphereGeometry(0.12, 6, 6);
+            const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color) });
+            const mesh = new THREE.Mesh(geo, mat);
+            scene.add(mesh);
+            // Add glow
+            const glowGeo = new THREE.SphereGeometry(0.22, 6, 6);
+            const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.3 });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            mesh.add(glow);
+            activeParticles.push({ mesh, wire, t: 0, speed: 0.008 + Math.random() * 0.004, done: false });
+        }
+
+        function animateInstruction(instr) {
+            resetSignals();
+            document.getElementById('stage-display').textContent = `EXECUTING: ${instr.text.toUpperCase()}`;
+
+            const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
+            (async () => {
+                // IF stage
+                highlightNode('PC', 1.5);
+                await delay(200);
+                spawnParticle(wires[0], '#00d4ff');
+                highlightNode('IMEM', 1.2);
+                await delay(300);
+                wires[2].mat.opacity = 0.9; wires[3].mat.opacity = 0.9; wires[4].mat.opacity = 0.9;
+
+                // ID stage
+                highlightNode('CTRL', 1.5);
+                spawnParticle(wires[2], '#ff6b35');
+                highlightNode('REGFILE', 1.2);
+                spawnParticle(wires[3], '#39ff14');
+                await delay(300);
+
+                if (instr.type === 'R') {
+                    highlightNode('MUX_ALU', 1);
+                    highlightNode('ALU', 1.8);
+                    wires[5].mat.opacity = 0.9; wires[7].mat.opacity = 0.9;
+                    spawnParticle(wires[5], '#39ff14');
+                    spawnParticle(wires[7], '#39ff14');
+                    await delay(400);
+                    spawnParticle(wires[8], '#ff3366');
+                    highlightNode('MUX_WB', 1);
+                    wires[10].mat.opacity = 0.9;
+                    await delay(300);
+                    spawnParticle(wires[11], '#44ffcc');
+                    highlightNode('REGFILE', 2);
+                    wires[11].mat.opacity = 0.9;
+                } else if (instr.type === 'I') {
+                    highlightNode('SEXT', 1.2);
+                    spawnParticle(wires[4], '#888800');
+                    await delay(200);
+                    const isLoad = instr.op === 'lw', isStore = instr.op === 'sw';
+                    highlightNode('ALU', 1.8);
+                    wires[5].mat.opacity = 0.9;
+                    spawnParticle(wires[5], '#cc88ff');
+                    await delay(300);
+                    if (isLoad || isStore) {
+                        highlightNode('DMEM', 2);
+                        wires[8].mat.opacity = 0.9;
+                        spawnParticle(wires[8], '#ff9944');
+                        await delay(300);
+                        if (isLoad) { spawnParticle(wires[9], '#ff9944'); highlightNode('MUX_WB', 1); }
+                    }
+                    if (instr.op === 'beq' || instr.op === 'bne') {
+                        highlightNode('BADDER', 1.5);
+                        wires[12].mat.opacity = 0.9;
+                        spawnParticle(wires[12], '#ffcc00');
+                    }
+                    if (!isStore) {
+                        await delay(300);
+                        spawnParticle(wires[11], '#44ffcc');
+                        highlightNode('REGFILE', 2);
+                    }
+                } else if (instr.type === 'J') {
+                    highlightNode('MUX_PC', 2);
+                    highlightNode('PC', 2);
+                }
+            })();
+        }
+
+        function animateSignals(instr, changedRegs, changedMem) {
+            animateInstruction(instr);
+        }
+
+        // Mouse controls
+        let isMouseDown = false, lastMX = 0, lastMY = 0;
+        let camTheta = 0, camPhi = 0.4, camRadius = 18;
+
+        function setupControls() {
+            const canvas = document.getElementById('three-canvas');
+            canvas.addEventListener('mousedown', e => { isMouseDown = true; lastMX = e.clientX; lastMY = e.clientY; });
+            canvas.addEventListener('mouseup', () => { isMouseDown = false; });
+            canvas.addEventListener('mousemove', e => {
+                if (!isMouseDown) return;
+                const dx = (e.clientX - lastMX) * 0.01, dy = (e.clientY - lastMY) * 0.01;
+                camTheta -= dx; camPhi = Math.max(0.1, Math.min(1.5, camPhi + dy));
+                lastMX = e.clientX; lastMY = e.clientY;
+            });
+            canvas.addEventListener('wheel', e => {
+                camRadius = Math.max(5, Math.min(40, camRadius + e.deltaY * 0.03));
+            });
+            // Touch
+            let lastTX = 0;
+            canvas.addEventListener('touchstart', e => { lastTX = e.touches[0].clientX; });
+            canvas.addEventListener('touchmove', e => {
+                const dx = (e.touches[0].clientX - lastTX) * 0.015;
+                camTheta -= dx; lastTX = e.touches[0].clientX;
+                e.preventDefault();
+            }, { passive: false });
+        }
+
+        function animate() {
+            animFrame = requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+
+            // Update camera
+            camera.position.x = camRadius * Math.sin(camTheta) * Math.cos(camPhi);
+            camera.position.y = camRadius * Math.sin(camPhi) + 2;
+            camera.position.z = camRadius * Math.cos(camTheta) * Math.cos(camPhi);
+            camera.lookAt(0, 0, 0);
+
+            // Animate particles along wires
+            activeParticles = activeParticles.filter(p => {
+                if (p.done) { scene.remove(p.mesh); return false; }
+                p.t += p.speed;
+                if (p.t >= 1) { p.done = true; return false; }
+                const pt = p.wire.curve.getPoint(p.t);
+                p.mesh.position.copy(pt);
+                return true;
+            });
+
+            // Pulse active nodes
+            const t = Date.now() * 0.002;
+            Object.values(nodes).forEach(n => {
+                if (n.mat.emissiveIntensity > n.baseIntensity + 0.01) {
+                    n.mat.emissiveIntensity -= dt * 0.5;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // =====================================================
+        // INIT
+        // =====================================================
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initThree();
+            renderRegisters(null);
+            renderMemory(null);
+
+            // Load sample program
+            document.getElementById('code-input').value = `add $t0, $t1, $t2
+addi $t1, $zero, 42
+ori $s0, $zero, 15
+sll $t2, $t1, 2
+lw $t3, 0($s0)
+sw $t2, 4($s0)
+beq $t0, $t1, 2
+sub $s1, $t0, $t1
+and $s2, $t0, $s1
+j 0`;
+
+            parseInstructions();
+        });
+    </script>
+</body>
+
+</html>
