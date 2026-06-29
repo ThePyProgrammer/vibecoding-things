@@ -13,5 +13,6 @@ I'm not super into using AI for coding so this is gonna be an exercise in foolin
 | [Lightsabers Jedi Duel in 3D](https://vibes.prannay.dev/lightsabers) | Claude Web App (Single Prompt) | Claude Sonnet 3.6 |
 | [3D Angry Birds](https://vibes.prannay.dev/angrybirds)               | Claude Web App (2x Prompts)    | Claude Sonnet 3.6 |
 | [MIPS Simulator](https://vibes.prannay.dev/mips)                     | Claude Web App (Single Prompt) | Claude Sonnet 3.6 |
+| [Closes MRT Finder](https://vibes.prannay.dev/closest_mrt)           | Codex TUI (5x Prompts)         | GPT 5.5           |
 
 Hopefully as I do this, I'll learn more about how to vibe code and what the best practices are. Till then, let's just fool around a bit with these tools :)
