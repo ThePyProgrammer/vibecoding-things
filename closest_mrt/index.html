@@ -266,6 +266,118 @@
       overflow-x: auto;
     }
 
+    .map-card {
+      background:
+        linear-gradient(135deg, rgba(36, 99, 166, 0.08), transparent 44%),
+        linear-gradient(315deg, rgba(240, 180, 60, 0.22), transparent 38%),
+        #dfe9e0;
+      border-bottom: 2px solid var(--ink);
+      padding: 14px;
+    }
+
+    .map-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .map-title {
+      font-family: Georgia, Iowan Old Style, serif;
+      font-size: 1.2rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .map-status {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 900;
+      letter-spacing: 0.07em;
+      text-align: right;
+      text-transform: uppercase;
+    }
+
+    .map-shell {
+      border: 2px solid var(--ink);
+      background: #bad8dc;
+      min-height: 250px;
+      position: relative;
+    }
+
+    .result-map {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 250px;
+    }
+
+    .map-marker {
+      cursor: pointer;
+      outline: none;
+    }
+
+    .map-marker circle,
+    .map-marker path {
+      vector-effect: non-scaling-stroke;
+    }
+
+    .map-marker:focus .marker-hit,
+    .map-marker:hover .marker-hit {
+      stroke-width: 4;
+    }
+
+    .route-overlay {
+      fill: none;
+      opacity: 0.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3.5;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .marker-label {
+      fill: var(--ink);
+      font: 800 12px Avenir Next, Trebuchet MS, sans-serif;
+      paint-order: stroke;
+      pointer-events: none;
+      stroke: rgba(255, 253, 247, 0.9);
+      stroke-linejoin: round;
+      stroke-width: 4;
+    }
+
+    .map-tooltip {
+      background: var(--ink);
+      border: 2px solid var(--ink);
+      box-shadow: 4px 4px 0 rgba(240, 180, 60, 0.85);
+      color: #fffdf7;
+      display: none;
+      font-size: 0.82rem;
+      font-weight: 800;
+      left: 0;
+      line-height: 1.25;
+      max-width: min(260px, calc(100% - 24px));
+      padding: 9px 10px;
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      transform: translate(12px, -50%);
+      z-index: 3;
+    }
+
+    .map-tooltip.is-visible {
+      display: block;
+    }
+
+    .map-tooltip span {
+      color: #d7dfdc;
+      display: block;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      margin-top: 3px;
+      text-transform: uppercase;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -294,6 +406,16 @@
 
     tbody tr:nth-child(odd) {
       background: rgba(16, 108, 91, 0.045);
+    }
+
+    tbody tr[data-result-index] {
+      cursor: pointer;
+    }
+
+    tbody tr[data-result-index]:hover,
+    tbody tr[data-result-index]:focus-within,
+    tbody tr[data-result-index].is-map-active {
+      background: rgba(240, 180, 60, 0.24);
     }
 
     .rank {
@@ -464,6 +586,15 @@
         grid-template-columns: 1fr;
       }
 
+      .map-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .map-status {
+        text-align: left;
+      }
+
       .metric {
         border-right: 0;
         border-bottom: 2px solid var(--ink);
@@ -508,6 +639,17 @@
           <div class="metric"><strong id="station-count">0</strong><span>Endpoints</span></div>
           <div class="metric"><strong id="best-total">-</strong><span>Best total cost</span></div>
           <div class="metric"><strong id="best-max">-</strong><span>Best max cost</span></div>
+        </div>
+
+        <div class="map-card" aria-label="Coordinate sketch of generated station options">
+          <div class="map-header">
+            <span class="map-title">Very serious coordinate map</span>
+            <span class="map-status" id="map-status">Hover a result</span>
+          </div>
+          <div class="map-shell">
+            <svg class="result-map" id="result-map" viewBox="0 0 900 430" role="img" aria-label="Interactive Singapore sketch map of generated MRT options"></svg>
+            <div class="map-tooltip" id="map-tooltip"></div>
+          </div>
         </div>
 
         <div class="table-wrap">
@@ -1655,6 +1797,601 @@
   "Changi Airport Branch": "East West Line",
   "Circle Line Extension": "Circle Line"
 };
+    const STATION_COORDINATES = {
+  "admiralty": {
+    "lat": 1.44058871,
+    "lng": 103.80097511
+  },
+  "aljunied": {
+    "lat": 1.31643349,
+    "lng": 103.88290453
+  },
+  "angmokio": {
+    "lat": 1.36967253,
+    "lng": 103.85025142
+  },
+  "bartley": {
+    "lat": 1.34284684,
+    "lng": 103.87972519
+  },
+  "bayfront": {
+    "lat": 1.28187224,
+    "lng": 103.85907514
+  },
+  "bayshore": {
+    "lat": 1.31293649,
+    "lng": 103.94184164
+  },
+  "beautyworld": {
+    "lat": 1.34122696,
+    "lng": 103.77579158
+  },
+  "bedok": {
+    "lat": 1.32401132,
+    "lng": 103.93017252
+  },
+  "bedoknorth": {
+    "lat": 1.33475563,
+    "lng": 103.91787672
+  },
+  "bedokreservoir": {
+    "lat": 1.33659874,
+    "lng": 103.93228755
+  },
+  "bencoolen": {
+    "lat": 1.29873835,
+    "lng": 103.85026002
+  },
+  "bendemeer": {
+    "lat": 1.31365959,
+    "lng": 103.8629693
+  },
+  "bishan": {
+    "lat": 1.35104848,
+    "lng": 103.84868243
+  },
+  "boonkeng": {
+    "lat": 1.31944709,
+    "lng": 103.86168109
+  },
+  "boonlay": {
+    "lat": 1.33835624,
+    "lng": 103.7053199
+  },
+  "botanicgardens": {
+    "lat": 1.3222556,
+    "lng": 103.8156186
+  },
+  "braddell": {
+    "lat": 1.34035746,
+    "lng": 103.84679534
+  },
+  "brasbasah": {
+    "lat": 1.29683005,
+    "lng": 103.85065881
+  },
+  "brighthill": {
+    "lat": 1.36328178,
+    "lng": 103.8344725
+  },
+  "buangkok": {
+    "lat": 1.38277158,
+    "lng": 103.89309247
+  },
+  "bugis": {
+    "lat": 1.29999751,
+    "lng": 103.85626865
+  },
+  "bukitbatok": {
+    "lat": 1.34899675,
+    "lng": 103.74954069
+  },
+  "bukitgombak": {
+    "lat": 1.35867192,
+    "lng": 103.75191011
+  },
+  "bukitpanjang": {
+    "lat": 1.37848547,
+    "lng": 103.76235266
+  },
+  "buonavista": {
+    "lat": 1.30687101,
+    "lng": 103.79028747
+  },
+  "caldecott": {
+    "lat": 1.33753877,
+    "lng": 103.83986539
+  },
+  "canberra": {
+    "lat": 1.44323459,
+    "lng": 103.82953968
+  },
+  "cashew": {
+    "lat": 1.36936637,
+    "lng": 103.76469934
+  },
+  "changiairport": {
+    "lat": 1.35731896,
+    "lng": 103.98834815
+  },
+  "chinatown": {
+    "lat": 1.28449799,
+    "lng": 103.8440036
+  },
+  "chinesegarden": {
+    "lat": 1.34214498,
+    "lng": 103.73281439
+  },
+  "choachukang": {
+    "lat": 1.38512547,
+    "lng": 103.74434409
+  },
+  "cityhall": {
+    "lat": 1.29293546,
+    "lng": 103.85260777
+  },
+  "clarkequay": {
+    "lat": 1.28860573,
+    "lng": 103.84664481
+  },
+  "clementi": {
+    "lat": 1.31593147,
+    "lng": 103.76560395
+  },
+  "commonwealth": {
+    "lat": 1.30244765,
+    "lng": 103.79829072
+  },
+  "dakota": {
+    "lat": 1.30837515,
+    "lng": 103.8886683
+  },
+  "dhobyghaut": {
+    "lat": 1.29914896,
+    "lng": 103.84581172
+  },
+  "dover": {
+    "lat": 1.31139469,
+    "lng": 103.77864915
+  },
+  "downtown": {
+    "lat": 1.27944195,
+    "lng": 103.85284217
+  },
+  "esplanade": {
+    "lat": 1.2932723,
+    "lng": 103.85561427
+  },
+  "eunos": {
+    "lat": 1.31976112,
+    "lng": 103.90325559
+  },
+  "expo": {
+    "lat": 1.33489805,
+    "lng": 103.96196342
+  },
+  "farrerpark": {
+    "lat": 1.31244823,
+    "lng": 103.85427016
+  },
+  "farrerroad": {
+    "lat": 1.31745457,
+    "lng": 103.80748912
+  },
+  "fortcanning": {
+    "lat": 1.29240323,
+    "lng": 103.8442891
+  },
+  "gardensbythebay": {
+    "lat": 1.27920047,
+    "lng": 103.86795488
+  },
+  "geylangbahru": {
+    "lat": 1.32151039,
+    "lng": 103.87190109
+  },
+  "greatworld": {
+    "lat": 1.29446784,
+    "lng": 103.83342646
+  },
+  "gulcircle": {
+    "lat": 1.31970326,
+    "lng": 103.66073679
+  },
+  "harbourfront": {
+    "lat": 1.26531069,
+    "lng": 103.82150741
+  },
+  "havelock": {
+    "lat": 1.28844197,
+    "lng": 103.83358978
+  },
+  "hawparvilla": {
+    "lat": 1.2825029,
+    "lng": 103.78182133
+  },
+  "hillview": {
+    "lat": 1.36233681,
+    "lng": 103.76742282
+  },
+  "hollandvillage": {
+    "lat": 1.31194562,
+    "lng": 103.79623334
+  },
+  "hougang": {
+    "lat": 1.37121513,
+    "lng": 103.89174864
+  },
+  "hume": {
+    "lat": 1.35451084,
+    "lng": 103.76910393
+  },
+  "jalanbesar": {
+    "lat": 1.3053767,
+    "lng": 103.85542875
+  },
+  "jookoon": {
+    "lat": 1.32774494,
+    "lng": 103.67828618
+  },
+  "jurongeast": {
+    "lat": 1.33305028,
+    "lng": 103.74210748
+  },
+  "kakibukit": {
+    "lat": 1.33496298,
+    "lng": 103.90845516
+  },
+  "kallang": {
+    "lat": 1.31141235,
+    "lng": 103.87131236
+  },
+  "katongpark": {
+    "lat": 1.29780104,
+    "lng": 103.88623637
+  },
+  "kembangan": {
+    "lat": 1.32103801,
+    "lng": 103.91294743
+  },
+  "kentridge": {
+    "lat": 1.29340094,
+    "lng": 103.78449794
+  },
+  "khatib": {
+    "lat": 1.41757538,
+    "lng": 103.83303809
+  },
+  "kingalbertpark": {
+    "lat": 1.33474175,
+    "lng": 103.78308419
+  },
+  "kovan": {
+    "lat": 1.36017987,
+    "lng": 103.88509112
+  },
+  "kranji": {
+    "lat": 1.42518923,
+    "lng": 103.76205895
+  },
+  "labradorpark": {
+    "lat": 1.27232349,
+    "lng": 103.8029277
+  },
+  "lakeside": {
+    "lat": 1.34426382,
+    "lng": 103.72096682
+  },
+  "lavender": {
+    "lat": 1.30737173,
+    "lng": 103.8628378
+  },
+  "lentor": {
+    "lat": 1.38494451,
+    "lng": 103.83633989
+  },
+  "littleindia": {
+    "lat": 1.30716419,
+    "lng": 103.84927785
+  },
+  "lorongchuan": {
+    "lat": 1.35161976,
+    "lng": 103.86414413
+  },
+  "macpherson": {
+    "lat": 1.32622933,
+    "lng": 103.88981661
+  },
+  "marinabay": {
+    "lat": 1.27580943,
+    "lng": 103.85498167
+  },
+  "marinasouthpier": {
+    "lat": 1.27137738,
+    "lng": 103.86291089
+  },
+  "marineparade": {
+    "lat": 1.30286599,
+    "lng": 103.90550807
+  },
+  "marineterrace": {
+    "lat": 1.30676742,
+    "lng": 103.91526558
+  },
+  "marsiling": {
+    "lat": 1.43257845,
+    "lng": 103.77404281
+  },
+  "marymount": {
+    "lat": 1.34877806,
+    "lng": 103.83941018
+  },
+  "mattar": {
+    "lat": 1.32686568,
+    "lng": 103.88325306
+  },
+  "maxwell": {
+    "lat": 1.28059641,
+    "lng": 103.84392437
+  },
+  "mayflower": {
+    "lat": 1.37210814,
+    "lng": 103.83678152
+  },
+  "mountbatten": {
+    "lat": 1.30619379,
+    "lng": 103.88254702
+  },
+  "napier": {
+    "lat": 1.30666565,
+    "lng": 103.81908277
+  },
+  "newton": {
+    "lat": 1.3129118,
+    "lng": 103.83803477
+  },
+  "nicollhighway": {
+    "lat": 1.29980283,
+    "lng": 103.86363314
+  },
+  "novena": {
+    "lat": 1.32043008,
+    "lng": 103.84381813
+  },
+  "onenorth": {
+    "lat": 1.29965146,
+    "lng": 103.78739138
+  },
+  "orchard": {
+    "lat": 1.30344465,
+    "lng": 103.83187417
+  },
+  "orchardboulevard": {
+    "lat": 1.30266611,
+    "lng": 103.82384764
+  },
+  "outrampark": {
+    "lat": 1.28083893,
+    "lng": 103.83925001
+  },
+  "pasirpanjang": {
+    "lat": 1.27622967,
+    "lng": 103.79134197
+  },
+  "pasirris": {
+    "lat": 1.37200982,
+    "lng": 103.9493343
+  },
+  "payalebar": {
+    "lat": 1.31774321,
+    "lng": 103.89267069
+  },
+  "pioneer": {
+    "lat": 1.3375951,
+    "lng": 103.69741523
+  },
+  "potongpasir": {
+    "lat": 1.33138739,
+    "lng": 103.86906996
+  },
+  "promenade": {
+    "lat": 1.2931439,
+    "lng": 103.86094757
+  },
+  "punggol": {
+    "lat": 1.40516544,
+    "lng": 103.90240396
+  },
+  "punggolcoast": {
+    "lat": 1.41493882,
+    "lng": 103.91021425
+  },
+  "queenstown": {
+    "lat": 1.29461133,
+    "lng": 103.80604524
+  },
+  "rafflesplace": {
+    "lat": 1.28406727,
+    "lng": 103.85145932
+  },
+  "redhill": {
+    "lat": 1.28963027,
+    "lng": 103.81677319
+  },
+  "rochor": {
+    "lat": 1.30392778,
+    "lng": 103.85243996
+  },
+  "sembawang": {
+    "lat": 1.44906746,
+    "lng": 103.8201879
+  },
+  "sengkang": {
+    "lat": 1.39155106,
+    "lng": 103.89542617
+  },
+  "serangoon": {
+    "lat": 1.35007415,
+    "lng": 103.87304885
+  },
+  "shentonway": {
+    "lat": 1.27759052,
+    "lng": 103.8506751
+  },
+  "siglap": {
+    "lat": 1.30988149,
+    "lng": 103.92991705
+  },
+  "simei": {
+    "lat": 1.34319744,
+    "lng": 103.95337712
+  },
+  "sixthavenue": {
+    "lat": 1.33080155,
+    "lng": 103.79726348
+  },
+  "somerset": {
+    "lat": 1.30026005,
+    "lng": 103.83907516
+  },
+  "springleaf": {
+    "lat": 1.39814098,
+    "lng": 103.81792114
+  },
+  "stadium": {
+    "lat": 1.3028541,
+    "lng": 103.87534796
+  },
+  "stevens": {
+    "lat": 1.31990068,
+    "lng": 103.82583342
+  },
+  "taiseng": {
+    "lat": 1.3354531,
+    "lng": 103.88816448
+  },
+  "tampines": {
+    "lat": 1.35422055,
+    "lng": 103.94408992
+  },
+  "tampineseast": {
+    "lat": 1.35621239,
+    "lng": 103.95485814
+  },
+  "tampineswest": {
+    "lat": 1.34551432,
+    "lng": 103.93843405
+  },
+  "tankahkee": {
+    "lat": 1.32587245,
+    "lng": 103.80733104
+  },
+  "tanahmerah": {
+    "lat": 1.32725408,
+    "lng": 103.94654794
+  },
+  "tanjongkatong": {
+    "lat": 1.29937056,
+    "lng": 103.89744885
+  },
+  "tanjongpagar": {
+    "lat": 1.27663115,
+    "lng": 103.84601319
+  },
+  "tanjongrhu": {
+    "lat": 1.29724529,
+    "lng": 103.87345502
+  },
+  "telokayer": {
+    "lat": 1.28228049,
+    "lng": 103.84832342
+  },
+  "telokblangah": {
+    "lat": 1.27058179,
+    "lng": 103.80973974
+  },
+  "tiongbahru": {
+    "lat": 1.28621974,
+    "lng": 103.82703434
+  },
+  "toapayoh": {
+    "lat": 1.33266799,
+    "lng": 103.84744521
+  },
+  "tuascrescent": {
+    "lat": 1.32113836,
+    "lng": 103.64896526
+  },
+  "tuaslink": {
+    "lat": 1.34027041,
+    "lng": 103.63675132
+  },
+  "tuaswestroad": {
+    "lat": 1.33003713,
+    "lng": 103.6395731
+  },
+  "ubi": {
+    "lat": 1.32995526,
+    "lng": 103.89924887
+  },
+  "upperchangi": {
+    "lat": 1.34174038,
+    "lng": 103.96147324
+  },
+  "upperthomson": {
+    "lat": 1.354429,
+    "lng": 103.83285967
+  },
+  "woodlands": {
+    "lat": 1.43644869,
+    "lng": 103.78705527
+  },
+  "woodlandsnorth": {
+    "lat": 1.44839232,
+    "lng": 103.78596634
+  },
+  "woodlandssouth": {
+    "lat": 1.42711515,
+    "lng": 103.79389795
+  },
+  "woodleigh": {
+    "lat": 1.33916077,
+    "lng": 103.87079169
+  },
+  "yewtee": {
+    "lat": 1.39754963,
+    "lng": 103.74740209
+  },
+  "yiochukang": {
+    "lat": 1.3817535,
+    "lng": 103.84480694
+  },
+  "yishun": {
+    "lat": 1.42957224,
+    "lng": 103.83497265
+  }
+};
+    const SINGAPORE_OUTLINE = [
+      [
+        { lat: 1.304, lng: 103.604 },
+        { lat: 1.336, lng: 103.632 },
+        { lat: 1.363, lng: 103.676 },
+        { lat: 1.386, lng: 103.728 },
+        { lat: 1.430, lng: 103.782 },
+        { lat: 1.466, lng: 103.832 },
+        { lat: 1.454, lng: 103.884 },
+        { lat: 1.417, lng: 103.934 },
+        { lat: 1.385, lng: 104.012 },
+        { lat: 1.335, lng: 104.035 },
+        { lat: 1.302, lng: 103.992 },
+        { lat: 1.285, lng: 103.926 },
+        { lat: 1.255, lng: 103.861 },
+        { lat: 1.246, lng: 103.801 },
+        { lat: 1.266, lng: 103.736 },
+        { lat: 1.282, lng: 103.670 },
+        { lat: 1.304, lng: 103.604 }
+      ]
+    ];
     const LINE_COLORS = {
       "North South Line": "#d42e12",
       "East West Line": "#009645",
@@ -1668,10 +2405,16 @@
       { incoming: "Punggol", outgoing: "HarbourFront" },
       { incoming: "Tampines", outgoing: "Expo" }
     ];
+    const MAP_WIDTH = 900;
+    const MAP_HEIGHT = 430;
+    const MAP_PADDING = 42;
 
     const state = {
       people: [],
       nextPersonId: 1,
+      mapItems: [],
+      mapHoverItem: null,
+      mapProjection: null,
       graph: buildGraph(LINE_DATA)
     };
 
@@ -1686,9 +2429,14 @@
     const bestTotal = document.querySelector("#best-total");
     const bestMax = document.querySelector("#best-max");
     const routePopover = document.querySelector("#route-popover-layer");
+    const resultMap = document.querySelector("#result-map");
+    const mapStatus = document.querySelector("#map-status");
+    const mapTooltip = document.querySelector("#map-tooltip");
 
     hydrateDatalist();
     addPerson();
+    renderResultMap([], []);
+    resultMap.addEventListener("mouseleave", hideMapTooltip);
 
     document.querySelector("#add-person").addEventListener("click", () => {
       addPerson();
@@ -1923,7 +2671,7 @@
       const lineChangePenalty = Math.max(0, Math.min(12, Number(transferPenalty.value) || 0));
       transferPenalty.value = String(lineChangePenalty);
       const results = optimize(origins, limit, lineChangePenalty);
-      renderResults(results);
+      renderResults(results, origins);
     }
 
     function optimizerOrigins() {
@@ -1947,20 +2695,22 @@
       return origins;
     }
 
-    function renderResults(results) {
+    function renderResults(results, origins) {
       if (!results.length) {
         resultsBody.innerHTML = `<tr><td class="empty" colspan="5">No connected station candidates found.</td></tr>`;
         bestTotal.textContent = "-";
         bestMax.textContent = "-";
         hideRoutePopover();
+        renderResultMap([], origins);
         return;
       }
 
       hideRoutePopover();
       bestTotal.textContent = String(results[0].totalDistance);
       bestMax.textContent = String(results[0].maxDistance);
+      renderResultMap(results, origins);
       resultsBody.innerHTML = results.map((result, index) => `
-        <tr>
+        <tr data-result-index="${index}" tabindex="0">
           <td class="rank">${index + 1}</td>
           <td>
             <span class="station-name">${escapeHtml(result.station.name)}</span>
@@ -1980,12 +2730,376 @@
         </tr>
       `).join("");
 
+      resultsBody.querySelectorAll("[data-result-index]").forEach((row) => {
+        const result = results[Number(row.dataset.resultIndex)];
+        row.addEventListener("mouseenter", () => showResultOnMap(result, Number(row.dataset.resultIndex), row));
+        row.addEventListener("focusin", () => showResultOnMap(result, Number(row.dataset.resultIndex), row));
+        row.addEventListener("mouseleave", () => hideResultOnMap(row));
+        row.addEventListener("focusout", () => hideResultOnMap(row));
+      });
+
       resultsBody.querySelectorAll(".distance-pill").forEach((pill) => {
         pill.addEventListener("mouseenter", () => showRoutePopover(pill));
         pill.addEventListener("focus", () => showRoutePopover(pill));
         pill.addEventListener("mouseleave", hideRoutePopover);
         pill.addEventListener("blur", hideRoutePopover);
       });
+    }
+
+    function showResultOnMap(result, index, row) {
+      resultsBody.querySelectorAll("[data-result-index]").forEach((item) => {
+        item.classList.toggle("is-map-active", item === row);
+      });
+      renderMapSvg({ ...result, rank: index + 1 });
+      mapStatus.textContent = `Showing ${result.station.name}: in -> option -> out routes`;
+    }
+
+    function hideResultOnMap(row) {
+      row.classList.remove("is-map-active");
+      renderMapSvg();
+      mapStatus.textContent = state.lastResults?.length
+        ? "Hover a result to plot its exact routes"
+        : "Singapore shadow ready";
+    }
+
+    function renderResultMap(results, origins) {
+      const coordinates = [
+        ...Object.values(STATION_COORDINATES),
+        ...SINGAPORE_OUTLINE.flat()
+      ];
+      const projection = mapProjection(coordinates, MAP_WIDTH, MAP_HEIGHT, MAP_PADDING);
+      const candidates = results.map((result, index) => ({
+        id: result.station.id,
+        name: result.station.name,
+        codes: result.station.codes,
+        rank: index + 1,
+        kind: "candidate",
+        detail: `${result.totalDistance} total, ${result.maxDistance} max`,
+        coordinate: STATION_COORDINATES[result.station.id]
+      })).filter((item) => item.coordinate);
+      const endpoints = origins.map((origin) => ({
+        id: origin.stationId,
+        name: origin.name,
+        codes: origin.codes,
+        rank: null,
+        kind: "endpoint",
+        direction: origin.direction,
+        detail: `${origin.codes.join(" / ")} endpoint`,
+        coordinate: STATION_COORDINATES[origin.stationId]
+      })).filter((item) => item.coordinate);
+
+      state.lastResults = results;
+      state.lastOrigins = origins;
+      state.mapProjection = projection;
+      state.mapItems = [
+        ...endpoints.map((item) => ({ ...item, layer: "endpoint" }))
+      ].map((item) => {
+        const point = mapPoint(item.coordinate, projection);
+        return {
+          ...item,
+          x: point.x,
+          y: point.y,
+          colors: stationLineColors(item.codes),
+          radius: 4.5
+        };
+      });
+      renderMapSvg();
+
+      mapStatus.textContent = candidates.length
+        ? "Hover a result to plot its exact routes"
+        : "Singapore shadow ready";
+    }
+
+    function renderMapSvg(activeResult) {
+      const candidate = activeResult
+        ? {
+            ...activeResult.station,
+            kind: "candidate",
+            rank: activeResult.rank,
+            detail: `${activeResult.totalDistance} total, ${activeResult.maxDistance} max`,
+            coordinate: STATION_COORDINATES[activeResult.station.id]
+          }
+        : null;
+      const candidatePoint = candidate?.coordinate ? mapPoint(candidate.coordinate, state.mapProjection) : null;
+      const candidateItem = candidatePoint
+        ? {
+            ...candidate,
+            x: candidatePoint.x,
+            y: candidatePoint.y,
+            colors: stationLineColors(candidate.codes),
+            radius: 6
+          }
+        : null;
+      resultMap.innerHTML = [
+        svgDefs(),
+        `<rect class="map-water" width="${MAP_WIDTH}" height="${MAP_HEIGHT}" fill="url(#map-water-gradient)"></rect>`,
+        cloudSvg(),
+        singaporeOutlinePath(state.mapProjection),
+        coordinateGridSvg(MAP_WIDTH, MAP_HEIGHT, MAP_PADDING),
+        activeResult ? routeOverlaySvg(activeResult) : "",
+        ...state.mapItems.filter((item) => item.kind === "endpoint").map(markerSvg),
+        candidateItem ? markerSvg(candidateItem) : "",
+        candidateItem ? labelSvg(candidateItem, 0) : "",
+        legendSvg(MAP_WIDTH, MAP_HEIGHT)
+      ].join("");
+
+      resultMap.querySelectorAll(".map-marker").forEach((marker) => {
+        marker.addEventListener("mouseenter", () => showMapTooltip(marker));
+        marker.addEventListener("focus", () => showMapTooltip(marker));
+        marker.addEventListener("mouseleave", hideMapTooltip);
+        marker.addEventListener("blur", hideMapTooltip);
+      });
+    }
+
+    function mapProjection(coordinates, width, height, padding) {
+      const projected = coordinates.map((coordinate) => projectCoordinate(coordinate));
+      const xs = projected.map((point) => point.x);
+      const ys = projected.map((point) => point.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const scale = Math.min(
+        (width - padding * 2) / (maxX - minX),
+        (height - padding * 2) / (maxY - minY)
+      );
+      const mapWidth = (maxX - minX) * scale;
+      const mapHeight = (maxY - minY) * scale;
+      return {
+        minX,
+        maxY,
+        scale,
+        offsetX: (width - mapWidth) / 2,
+        offsetY: (height - mapHeight) / 2,
+        width,
+        height,
+        padding
+      };
+    }
+
+    function projectCoordinate(coordinate) {
+      const meanLatitude = 1.35 * Math.PI / 180;
+      return {
+        x: coordinate.lng * Math.cos(meanLatitude),
+        y: coordinate.lat
+      };
+    }
+
+    function mapPoint(coordinate, projection) {
+      const projected = projectCoordinate(coordinate);
+      return {
+        x: projection.offsetX + (projected.x - projection.minX) * projection.scale,
+        y: projection.offsetY + (projection.maxY - projected.y) * projection.scale
+      };
+    }
+
+    function svgDefs() {
+      return `
+        <defs>
+          <linearGradient id="map-water-gradient" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stop-color="#9fc5cb"></stop>
+            <stop offset="0.55" stop-color="#c8dedb"></stop>
+            <stop offset="1" stop-color="#f4dfad"></stop>
+          </linearGradient>
+          <filter id="land-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="10" dy="12" stdDeviation="7" flood-color="#1b2628" flood-opacity="0.22"></feDropShadow>
+          </filter>
+          <marker id="arrow-head" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="2.4" markerHeight="2.4" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path>
+          </marker>
+        </defs>
+      `;
+    }
+
+    function cloudSvg() {
+      return Array.from({ length: 9 }, (_item, index) => {
+        const x = MAP_WIDTH * (0.12 + index * 0.1);
+        const radius = 24 + index * 4;
+        return `<circle cx="${x}" cy="${MAP_HEIGHT * 0.18}" r="${radius}" fill="rgba(255, 253, 247, 0.24)"></circle>`;
+      }).join("");
+    }
+
+    function singaporeOutlinePath(projection) {
+      return SINGAPORE_OUTLINE.map((ring) => {
+        const d = ring.map((coordinate, index) => {
+          const point = mapPoint(coordinate, projection);
+          return `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+        }).join(" ");
+        return `
+          <path d="${d} Z" fill="rgba(255, 253, 247, 0.72)" filter="url(#land-shadow)"></path>
+          <path d="${d} Z" fill="none" stroke="rgba(27, 38, 40, 0.28)" stroke-width="2" vector-effect="non-scaling-stroke"></path>
+        `;
+      }).join("");
+    }
+
+    function coordinateGridSvg(width, height, padding) {
+      const lines = [];
+      for (let index = 0; index <= 6; index += 1) {
+        const x = padding + ((width - padding * 2) / 6) * index;
+        const y = padding + ((height - padding * 2) / 6) * index;
+        lines.push(`<line x1="${x}" y1="${padding}" x2="${x}" y2="${height - padding}"></line>`);
+        lines.push(`<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}"></line>`);
+      }
+      return `<g stroke="rgba(27, 38, 40, 0.1)" stroke-width="1" vector-effect="non-scaling-stroke">${lines.join("")}</g>`;
+    }
+
+    function routeOverlaySvg(result) {
+      const overlays = result.distances.flatMap((item, routeIndex) => {
+        const displayRoute = item.origin.direction === "out" ? [...item.route].reverse() : item.route;
+        return routeSegments(displayRoute, item.origin.direction).map((segment, segmentIndex) => {
+          const color = lineColor(segment.line);
+          const opacity = item.origin.direction === "out" ? 0.42 : 0.58;
+          const dash = item.origin.direction === "out" ? ' stroke-dasharray="8 5"' : "";
+          return `
+            <path
+              class="route-overlay"
+              d="M ${segment.from.x.toFixed(2)} ${segment.from.y.toFixed(2)} L ${segment.to.x.toFixed(2)} ${segment.to.y.toFixed(2)}"
+              stroke="${color}"
+              opacity="${opacity}"
+              marker-end="url(#arrow-head)"
+              data-route-index="${routeIndex}"
+              data-segment-index="${segmentIndex}"${dash}>
+            </path>
+          `;
+        });
+      });
+      return `<g class="route-overlays">${overlays.join("")}</g>`;
+    }
+
+    function routeSegments(route, direction) {
+      const segments = [];
+      for (let index = 0; index < route.length - 1; index += 1) {
+        const step = route[index];
+        const nextStep = route[index + 1];
+        const fromCoordinate = STATION_COORDINATES[step.stationId];
+        const toCoordinate = STATION_COORDINATES[nextStep.stationId];
+        if (!fromCoordinate || !toCoordinate) continue;
+        segments.push({
+          from: mapPoint(fromCoordinate, state.mapProjection),
+          to: mapPoint(toCoordinate, state.mapProjection),
+          line: routeLineForStep(step, nextStep, direction)
+        });
+      }
+      return segments;
+    }
+
+    function routeLineForStep(step, nextStep, direction) {
+      return direction === "out"
+        ? step.line || nextStep.line || ""
+        : nextStep.line || step.line || "";
+    }
+
+    function markerSvg(item) {
+      const isBest = item.kind === "candidate" && item.rank === 1;
+      const label = item.kind === "candidate" ? `#${item.rank} ${item.name}` : item.name;
+      const rings = isBest
+        ? `<circle cx="${item.x}" cy="${item.y}" r="${item.radius + 5}" fill="none" stroke="rgba(240, 180, 60, 0.75)" stroke-width="3" vector-effect="non-scaling-stroke"></circle>`
+        : "";
+      return `
+        <g class="map-marker" tabindex="0" role="button" aria-label="${escapeAttribute(label)}" data-label="${escapeAttribute(label)}" data-detail="${escapeAttribute(item.detail)}">
+          <title>${escapeHtml(label)} ${escapeHtml(item.detail)}</title>
+          ${rings}
+          ${stationMarkerSvg(item.x, item.y, item.radius, item.colors)}
+          <circle class="marker-hit" cx="${item.x}" cy="${item.y}" r="${item.radius}" fill="none" stroke="#1b2628" stroke-width="${isBest ? 3 : 2}" vector-effect="non-scaling-stroke"></circle>
+        </g>
+      `;
+    }
+
+    function stationMarkerSvg(x, y, radius, colors) {
+      const markerColors = colors.length ? colors : ["#d7dfdc"];
+      if (markerColors.length === 1) {
+        return `<circle cx="${x}" cy="${y}" r="${radius}" fill="${markerColors[0]}"></circle>`;
+      }
+
+      return markerColors.map((color, index) => {
+        const start = -Math.PI / 2 + (Math.PI * 2 * index) / markerColors.length;
+        const end = -Math.PI / 2 + (Math.PI * 2 * (index + 1)) / markerColors.length;
+        return `<path d="${arcSlicePath(x, y, radius, start, end)}" fill="${color}"></path>`;
+      }).join("");
+    }
+
+    function arcSlicePath(x, y, radius, start, end) {
+      const startX = x + Math.cos(start) * radius;
+      const startY = y + Math.sin(start) * radius;
+      const endX = x + Math.cos(end) * radius;
+      const endY = y + Math.sin(end) * radius;
+      const largeArc = end - start > Math.PI ? 1 : 0;
+      return [
+        `M ${x.toFixed(2)} ${y.toFixed(2)}`,
+        `L ${startX.toFixed(2)} ${startY.toFixed(2)}`,
+        `A ${radius} ${radius} 0 ${largeArc} 1 ${endX.toFixed(2)} ${endY.toFixed(2)}`,
+        "Z"
+      ].join(" ");
+    }
+
+    function stationLineColors(codes) {
+      const colors = [];
+      for (const code of codes || []) {
+        const color = lineColor(lineNameForCode(code));
+        if (!colors.includes(color)) colors.push(color);
+      }
+      return colors;
+    }
+
+    function lineNameForCode(code) {
+      const prefix = String(code).replace(/[0-9]+.*/, "");
+      return {
+        NS: "North South Line",
+        EW: "East West Line",
+        CG: "East West Line",
+        NE: "North East Line",
+        CC: "Circle Line",
+        CE: "Circle Line",
+        DT: "Downtown Line",
+        TE: "Thomson-East Coast Line"
+      }[prefix] || "";
+    }
+
+    function labelSvg(item, index) {
+        const label = `#${item.rank} ${item.name}`;
+        const labelX = Math.min(item.x + 13, MAP_WIDTH - label.length * 7 - 10);
+        const labelY = Math.max(16, Math.min(item.y + (index % 2 ? 15 : -15), MAP_HEIGHT - 16));
+        return `<text class="marker-label" x="${labelX}" y="${labelY}">${escapeHtml(label)}</text>`;
+    }
+
+    function legendSvg(width, height) {
+      const items = [
+        ["North South Line", "NSL"],
+        ["East West Line", "EWL"],
+        ["North East Line", "NEL"],
+        ["Circle Line", "CCL"],
+        ["Downtown Line", "DTL"],
+        ["Thomson-East Coast Line", "TEL"]
+      ];
+      const x = 14;
+      const y = height - 20;
+      const legendItems = items.map(([lineName, label], index) => {
+        const offset = index * 54;
+        return `
+          <circle cx="${x + offset + 5}" cy="${y}" r="5" fill="${lineColor(lineName)}" stroke="#1b2628" stroke-width="1.5" vector-effect="non-scaling-stroke"></circle>
+          <text x="${x + offset + 14}" y="${y + 4}" fill="#1b2628" font-size="11" font-weight="800">${label}</text>
+        `;
+      }).join("");
+      return `<g class="map-legend">${legendItems}</g>`;
+    }
+
+    function showMapTooltip(marker) {
+      mapTooltip.innerHTML = `${escapeHtml(marker.dataset.label)}<span>${escapeHtml(marker.dataset.detail)}</span>`;
+      mapTooltip.classList.add("is-visible");
+      const markerRect = marker.getBoundingClientRect();
+      const shellRect = resultMap.parentElement.getBoundingClientRect();
+      const tooltipWidth = mapTooltip.offsetWidth || 180;
+      const tooltipHeight = mapTooltip.offsetHeight || 54;
+      const x = markerRect.left + markerRect.width / 2 - shellRect.left;
+      const y = markerRect.top + markerRect.height / 2 - shellRect.top;
+      const left = Math.min(Math.max(8, x + 12), shellRect.width - tooltipWidth - 8);
+      const top = Math.min(Math.max(tooltipHeight / 2 + 8, y), shellRect.height - tooltipHeight / 2 - 8);
+      mapTooltip.style.left = `${left}px`;
+      mapTooltip.style.top = `${top}px`;
+    }
+
+    function hideMapTooltip() {
+      mapTooltip.classList.remove("is-visible");
     }
 
     function routeTimeline(item, destination) {

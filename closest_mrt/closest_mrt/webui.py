@@ -4,13 +4,17 @@ import json
 from pathlib import Path
 
 from .singapore_mrt import LINES, LINE_GROUPS
+from .station_coordinates import STATION_COORDINATES
 
 
 def build_index_html() -> str:
     line_data = json.dumps(LINES, indent=2)
     line_groups = json.dumps(LINE_GROUPS, indent=2)
+    station_coordinates = json.dumps(STATION_COORDINATES, indent=2)
     return TEMPLATE.replace("__LINE_DATA__", line_data).replace(
         "__LINE_GROUPS__", line_groups
+    ).replace(
+        "__STATION_COORDINATES__", station_coordinates
     )
 
 
@@ -288,6 +292,118 @@ TEMPLATE = """<!doctype html>
       overflow-x: auto;
     }
 
+    .map-card {
+      background:
+        linear-gradient(135deg, rgba(36, 99, 166, 0.08), transparent 44%),
+        linear-gradient(315deg, rgba(240, 180, 60, 0.22), transparent 38%),
+        #dfe9e0;
+      border-bottom: 2px solid var(--ink);
+      padding: 14px;
+    }
+
+    .map-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .map-title {
+      font-family: Georgia, Iowan Old Style, serif;
+      font-size: 1.2rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .map-status {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 900;
+      letter-spacing: 0.07em;
+      text-align: right;
+      text-transform: uppercase;
+    }
+
+    .map-shell {
+      border: 2px solid var(--ink);
+      background: #bad8dc;
+      min-height: 250px;
+      position: relative;
+    }
+
+    .result-map {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 250px;
+    }
+
+    .map-marker {
+      cursor: pointer;
+      outline: none;
+    }
+
+    .map-marker circle,
+    .map-marker path {
+      vector-effect: non-scaling-stroke;
+    }
+
+    .map-marker:focus .marker-hit,
+    .map-marker:hover .marker-hit {
+      stroke-width: 4;
+    }
+
+    .route-overlay {
+      fill: none;
+      opacity: 0.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3.5;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .marker-label {
+      fill: var(--ink);
+      font: 800 12px Avenir Next, Trebuchet MS, sans-serif;
+      paint-order: stroke;
+      pointer-events: none;
+      stroke: rgba(255, 253, 247, 0.9);
+      stroke-linejoin: round;
+      stroke-width: 4;
+    }
+
+    .map-tooltip {
+      background: var(--ink);
+      border: 2px solid var(--ink);
+      box-shadow: 4px 4px 0 rgba(240, 180, 60, 0.85);
+      color: #fffdf7;
+      display: none;
+      font-size: 0.82rem;
+      font-weight: 800;
+      left: 0;
+      line-height: 1.25;
+      max-width: min(260px, calc(100% - 24px));
+      padding: 9px 10px;
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      transform: translate(12px, -50%);
+      z-index: 3;
+    }
+
+    .map-tooltip.is-visible {
+      display: block;
+    }
+
+    .map-tooltip span {
+      color: #d7dfdc;
+      display: block;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      margin-top: 3px;
+      text-transform: uppercase;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -316,6 +432,16 @@ TEMPLATE = """<!doctype html>
 
     tbody tr:nth-child(odd) {
       background: rgba(16, 108, 91, 0.045);
+    }
+
+    tbody tr[data-result-index] {
+      cursor: pointer;
+    }
+
+    tbody tr[data-result-index]:hover,
+    tbody tr[data-result-index]:focus-within,
+    tbody tr[data-result-index].is-map-active {
+      background: rgba(240, 180, 60, 0.24);
     }
 
     .rank {
@@ -486,6 +612,15 @@ TEMPLATE = """<!doctype html>
         grid-template-columns: 1fr;
       }
 
+      .map-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .map-status {
+        text-align: left;
+      }
+
       .metric {
         border-right: 0;
         border-bottom: 2px solid var(--ink);
@@ -532,6 +667,17 @@ TEMPLATE = """<!doctype html>
           <div class="metric"><strong id="best-max">-</strong><span>Best max cost</span></div>
         </div>
 
+        <div class="map-card" aria-label="Coordinate sketch of generated station options">
+          <div class="map-header">
+            <span class="map-title">Very serious coordinate map</span>
+            <span class="map-status" id="map-status">Hover a result</span>
+          </div>
+          <div class="map-shell">
+            <svg class="result-map" id="result-map" viewBox="0 0 900 430" role="img" aria-label="Interactive Singapore sketch map of generated MRT options"></svg>
+            <div class="map-tooltip" id="map-tooltip"></div>
+          </div>
+        </div>
+
         <div class="table-wrap">
           <table>
             <thead>
@@ -556,6 +702,28 @@ TEMPLATE = """<!doctype html>
   <script>
     const LINE_DATA = __LINE_DATA__;
     const LINE_GROUPS = __LINE_GROUPS__;
+    const STATION_COORDINATES = __STATION_COORDINATES__;
+    const SINGAPORE_OUTLINE = [
+      [
+        { lat: 1.304, lng: 103.604 },
+        { lat: 1.336, lng: 103.632 },
+        { lat: 1.363, lng: 103.676 },
+        { lat: 1.386, lng: 103.728 },
+        { lat: 1.430, lng: 103.782 },
+        { lat: 1.466, lng: 103.832 },
+        { lat: 1.454, lng: 103.884 },
+        { lat: 1.417, lng: 103.934 },
+        { lat: 1.385, lng: 104.012 },
+        { lat: 1.335, lng: 104.035 },
+        { lat: 1.302, lng: 103.992 },
+        { lat: 1.285, lng: 103.926 },
+        { lat: 1.255, lng: 103.861 },
+        { lat: 1.246, lng: 103.801 },
+        { lat: 1.266, lng: 103.736 },
+        { lat: 1.282, lng: 103.670 },
+        { lat: 1.304, lng: 103.604 }
+      ]
+    ];
     const LINE_COLORS = {
       "North South Line": "#d42e12",
       "East West Line": "#009645",
@@ -569,10 +737,16 @@ TEMPLATE = """<!doctype html>
       { incoming: "Punggol", outgoing: "HarbourFront" },
       { incoming: "Tampines", outgoing: "Expo" }
     ];
+    const MAP_WIDTH = 900;
+    const MAP_HEIGHT = 430;
+    const MAP_PADDING = 42;
 
     const state = {
       people: [],
       nextPersonId: 1,
+      mapItems: [],
+      mapHoverItem: null,
+      mapProjection: null,
       graph: buildGraph(LINE_DATA)
     };
 
@@ -587,9 +761,14 @@ TEMPLATE = """<!doctype html>
     const bestTotal = document.querySelector("#best-total");
     const bestMax = document.querySelector("#best-max");
     const routePopover = document.querySelector("#route-popover-layer");
+    const resultMap = document.querySelector("#result-map");
+    const mapStatus = document.querySelector("#map-status");
+    const mapTooltip = document.querySelector("#map-tooltip");
 
     hydrateDatalist();
     addPerson();
+    renderResultMap([], []);
+    resultMap.addEventListener("mouseleave", hideMapTooltip);
 
     document.querySelector("#add-person").addEventListener("click", () => {
       addPerson();
@@ -824,7 +1003,7 @@ TEMPLATE = """<!doctype html>
       const lineChangePenalty = Math.max(0, Math.min(12, Number(transferPenalty.value) || 0));
       transferPenalty.value = String(lineChangePenalty);
       const results = optimize(origins, limit, lineChangePenalty);
-      renderResults(results);
+      renderResults(results, origins);
     }
 
     function optimizerOrigins() {
@@ -848,20 +1027,22 @@ TEMPLATE = """<!doctype html>
       return origins;
     }
 
-    function renderResults(results) {
+    function renderResults(results, origins) {
       if (!results.length) {
         resultsBody.innerHTML = `<tr><td class="empty" colspan="5">No connected station candidates found.</td></tr>`;
         bestTotal.textContent = "-";
         bestMax.textContent = "-";
         hideRoutePopover();
+        renderResultMap([], origins);
         return;
       }
 
       hideRoutePopover();
       bestTotal.textContent = String(results[0].totalDistance);
       bestMax.textContent = String(results[0].maxDistance);
+      renderResultMap(results, origins);
       resultsBody.innerHTML = results.map((result, index) => `
-        <tr>
+        <tr data-result-index="${index}" tabindex="0">
           <td class="rank">${index + 1}</td>
           <td>
             <span class="station-name">${escapeHtml(result.station.name)}</span>
@@ -881,12 +1062,376 @@ TEMPLATE = """<!doctype html>
         </tr>
       `).join("");
 
+      resultsBody.querySelectorAll("[data-result-index]").forEach((row) => {
+        const result = results[Number(row.dataset.resultIndex)];
+        row.addEventListener("mouseenter", () => showResultOnMap(result, Number(row.dataset.resultIndex), row));
+        row.addEventListener("focusin", () => showResultOnMap(result, Number(row.dataset.resultIndex), row));
+        row.addEventListener("mouseleave", () => hideResultOnMap(row));
+        row.addEventListener("focusout", () => hideResultOnMap(row));
+      });
+
       resultsBody.querySelectorAll(".distance-pill").forEach((pill) => {
         pill.addEventListener("mouseenter", () => showRoutePopover(pill));
         pill.addEventListener("focus", () => showRoutePopover(pill));
         pill.addEventListener("mouseleave", hideRoutePopover);
         pill.addEventListener("blur", hideRoutePopover);
       });
+    }
+
+    function showResultOnMap(result, index, row) {
+      resultsBody.querySelectorAll("[data-result-index]").forEach((item) => {
+        item.classList.toggle("is-map-active", item === row);
+      });
+      renderMapSvg({ ...result, rank: index + 1 });
+      mapStatus.textContent = `Showing ${result.station.name}: in -> option -> out routes`;
+    }
+
+    function hideResultOnMap(row) {
+      row.classList.remove("is-map-active");
+      renderMapSvg();
+      mapStatus.textContent = state.lastResults?.length
+        ? "Hover a result to plot its exact routes"
+        : "Singapore shadow ready";
+    }
+
+    function renderResultMap(results, origins) {
+      const coordinates = [
+        ...Object.values(STATION_COORDINATES),
+        ...SINGAPORE_OUTLINE.flat()
+      ];
+      const projection = mapProjection(coordinates, MAP_WIDTH, MAP_HEIGHT, MAP_PADDING);
+      const candidates = results.map((result, index) => ({
+        id: result.station.id,
+        name: result.station.name,
+        codes: result.station.codes,
+        rank: index + 1,
+        kind: "candidate",
+        detail: `${result.totalDistance} total, ${result.maxDistance} max`,
+        coordinate: STATION_COORDINATES[result.station.id]
+      })).filter((item) => item.coordinate);
+      const endpoints = origins.map((origin) => ({
+        id: origin.stationId,
+        name: origin.name,
+        codes: origin.codes,
+        rank: null,
+        kind: "endpoint",
+        direction: origin.direction,
+        detail: `${origin.codes.join(" / ")} endpoint`,
+        coordinate: STATION_COORDINATES[origin.stationId]
+      })).filter((item) => item.coordinate);
+
+      state.lastResults = results;
+      state.lastOrigins = origins;
+      state.mapProjection = projection;
+      state.mapItems = [
+        ...endpoints.map((item) => ({ ...item, layer: "endpoint" }))
+      ].map((item) => {
+        const point = mapPoint(item.coordinate, projection);
+        return {
+          ...item,
+          x: point.x,
+          y: point.y,
+          colors: stationLineColors(item.codes),
+          radius: 4.5
+        };
+      });
+      renderMapSvg();
+
+      mapStatus.textContent = candidates.length
+        ? "Hover a result to plot its exact routes"
+        : "Singapore shadow ready";
+    }
+
+    function renderMapSvg(activeResult) {
+      const candidate = activeResult
+        ? {
+            ...activeResult.station,
+            kind: "candidate",
+            rank: activeResult.rank,
+            detail: `${activeResult.totalDistance} total, ${activeResult.maxDistance} max`,
+            coordinate: STATION_COORDINATES[activeResult.station.id]
+          }
+        : null;
+      const candidatePoint = candidate?.coordinate ? mapPoint(candidate.coordinate, state.mapProjection) : null;
+      const candidateItem = candidatePoint
+        ? {
+            ...candidate,
+            x: candidatePoint.x,
+            y: candidatePoint.y,
+            colors: stationLineColors(candidate.codes),
+            radius: 6
+          }
+        : null;
+      resultMap.innerHTML = [
+        svgDefs(),
+        `<rect class="map-water" width="${MAP_WIDTH}" height="${MAP_HEIGHT}" fill="url(#map-water-gradient)"></rect>`,
+        cloudSvg(),
+        singaporeOutlinePath(state.mapProjection),
+        coordinateGridSvg(MAP_WIDTH, MAP_HEIGHT, MAP_PADDING),
+        activeResult ? routeOverlaySvg(activeResult) : "",
+        ...state.mapItems.filter((item) => item.kind === "endpoint").map(markerSvg),
+        candidateItem ? markerSvg(candidateItem) : "",
+        candidateItem ? labelSvg(candidateItem, 0) : "",
+        legendSvg(MAP_WIDTH, MAP_HEIGHT)
+      ].join("");
+
+      resultMap.querySelectorAll(".map-marker").forEach((marker) => {
+        marker.addEventListener("mouseenter", () => showMapTooltip(marker));
+        marker.addEventListener("focus", () => showMapTooltip(marker));
+        marker.addEventListener("mouseleave", hideMapTooltip);
+        marker.addEventListener("blur", hideMapTooltip);
+      });
+    }
+
+    function mapProjection(coordinates, width, height, padding) {
+      const projected = coordinates.map((coordinate) => projectCoordinate(coordinate));
+      const xs = projected.map((point) => point.x);
+      const ys = projected.map((point) => point.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const scale = Math.min(
+        (width - padding * 2) / (maxX - minX),
+        (height - padding * 2) / (maxY - minY)
+      );
+      const mapWidth = (maxX - minX) * scale;
+      const mapHeight = (maxY - minY) * scale;
+      return {
+        minX,
+        maxY,
+        scale,
+        offsetX: (width - mapWidth) / 2,
+        offsetY: (height - mapHeight) / 2,
+        width,
+        height,
+        padding
+      };
+    }
+
+    function projectCoordinate(coordinate) {
+      const meanLatitude = 1.35 * Math.PI / 180;
+      return {
+        x: coordinate.lng * Math.cos(meanLatitude),
+        y: coordinate.lat
+      };
+    }
+
+    function mapPoint(coordinate, projection) {
+      const projected = projectCoordinate(coordinate);
+      return {
+        x: projection.offsetX + (projected.x - projection.minX) * projection.scale,
+        y: projection.offsetY + (projection.maxY - projected.y) * projection.scale
+      };
+    }
+
+    function svgDefs() {
+      return `
+        <defs>
+          <linearGradient id="map-water-gradient" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stop-color="#9fc5cb"></stop>
+            <stop offset="0.55" stop-color="#c8dedb"></stop>
+            <stop offset="1" stop-color="#f4dfad"></stop>
+          </linearGradient>
+          <filter id="land-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="10" dy="12" stdDeviation="7" flood-color="#1b2628" flood-opacity="0.22"></feDropShadow>
+          </filter>
+          <marker id="arrow-head" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="2.4" markerHeight="2.4" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path>
+          </marker>
+        </defs>
+      `;
+    }
+
+    function cloudSvg() {
+      return Array.from({ length: 9 }, (_item, index) => {
+        const x = MAP_WIDTH * (0.12 + index * 0.1);
+        const radius = 24 + index * 4;
+        return `<circle cx="${x}" cy="${MAP_HEIGHT * 0.18}" r="${radius}" fill="rgba(255, 253, 247, 0.24)"></circle>`;
+      }).join("");
+    }
+
+    function singaporeOutlinePath(projection) {
+      return SINGAPORE_OUTLINE.map((ring) => {
+        const d = ring.map((coordinate, index) => {
+          const point = mapPoint(coordinate, projection);
+          return `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+        }).join(" ");
+        return `
+          <path d="${d} Z" fill="rgba(255, 253, 247, 0.72)" filter="url(#land-shadow)"></path>
+          <path d="${d} Z" fill="none" stroke="rgba(27, 38, 40, 0.28)" stroke-width="2" vector-effect="non-scaling-stroke"></path>
+        `;
+      }).join("");
+    }
+
+    function coordinateGridSvg(width, height, padding) {
+      const lines = [];
+      for (let index = 0; index <= 6; index += 1) {
+        const x = padding + ((width - padding * 2) / 6) * index;
+        const y = padding + ((height - padding * 2) / 6) * index;
+        lines.push(`<line x1="${x}" y1="${padding}" x2="${x}" y2="${height - padding}"></line>`);
+        lines.push(`<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}"></line>`);
+      }
+      return `<g stroke="rgba(27, 38, 40, 0.1)" stroke-width="1" vector-effect="non-scaling-stroke">${lines.join("")}</g>`;
+    }
+
+    function routeOverlaySvg(result) {
+      const overlays = result.distances.flatMap((item, routeIndex) => {
+        const displayRoute = item.origin.direction === "out" ? [...item.route].reverse() : item.route;
+        return routeSegments(displayRoute, item.origin.direction).map((segment, segmentIndex) => {
+          const color = lineColor(segment.line);
+          const opacity = item.origin.direction === "out" ? 0.42 : 0.58;
+          const dash = item.origin.direction === "out" ? ' stroke-dasharray="8 5"' : "";
+          return `
+            <path
+              class="route-overlay"
+              d="M ${segment.from.x.toFixed(2)} ${segment.from.y.toFixed(2)} L ${segment.to.x.toFixed(2)} ${segment.to.y.toFixed(2)}"
+              stroke="${color}"
+              opacity="${opacity}"
+              marker-end="url(#arrow-head)"
+              data-route-index="${routeIndex}"
+              data-segment-index="${segmentIndex}"${dash}>
+            </path>
+          `;
+        });
+      });
+      return `<g class="route-overlays">${overlays.join("")}</g>`;
+    }
+
+    function routeSegments(route, direction) {
+      const segments = [];
+      for (let index = 0; index < route.length - 1; index += 1) {
+        const step = route[index];
+        const nextStep = route[index + 1];
+        const fromCoordinate = STATION_COORDINATES[step.stationId];
+        const toCoordinate = STATION_COORDINATES[nextStep.stationId];
+        if (!fromCoordinate || !toCoordinate) continue;
+        segments.push({
+          from: mapPoint(fromCoordinate, state.mapProjection),
+          to: mapPoint(toCoordinate, state.mapProjection),
+          line: routeLineForStep(step, nextStep, direction)
+        });
+      }
+      return segments;
+    }
+
+    function routeLineForStep(step, nextStep, direction) {
+      return direction === "out"
+        ? step.line || nextStep.line || ""
+        : nextStep.line || step.line || "";
+    }
+
+    function markerSvg(item) {
+      const isBest = item.kind === "candidate" && item.rank === 1;
+      const label = item.kind === "candidate" ? `#${item.rank} ${item.name}` : item.name;
+      const rings = isBest
+        ? `<circle cx="${item.x}" cy="${item.y}" r="${item.radius + 5}" fill="none" stroke="rgba(240, 180, 60, 0.75)" stroke-width="3" vector-effect="non-scaling-stroke"></circle>`
+        : "";
+      return `
+        <g class="map-marker" tabindex="0" role="button" aria-label="${escapeAttribute(label)}" data-label="${escapeAttribute(label)}" data-detail="${escapeAttribute(item.detail)}">
+          <title>${escapeHtml(label)} ${escapeHtml(item.detail)}</title>
+          ${rings}
+          ${stationMarkerSvg(item.x, item.y, item.radius, item.colors)}
+          <circle class="marker-hit" cx="${item.x}" cy="${item.y}" r="${item.radius}" fill="none" stroke="#1b2628" stroke-width="${isBest ? 3 : 2}" vector-effect="non-scaling-stroke"></circle>
+        </g>
+      `;
+    }
+
+    function stationMarkerSvg(x, y, radius, colors) {
+      const markerColors = colors.length ? colors : ["#d7dfdc"];
+      if (markerColors.length === 1) {
+        return `<circle cx="${x}" cy="${y}" r="${radius}" fill="${markerColors[0]}"></circle>`;
+      }
+
+      return markerColors.map((color, index) => {
+        const start = -Math.PI / 2 + (Math.PI * 2 * index) / markerColors.length;
+        const end = -Math.PI / 2 + (Math.PI * 2 * (index + 1)) / markerColors.length;
+        return `<path d="${arcSlicePath(x, y, radius, start, end)}" fill="${color}"></path>`;
+      }).join("");
+    }
+
+    function arcSlicePath(x, y, radius, start, end) {
+      const startX = x + Math.cos(start) * radius;
+      const startY = y + Math.sin(start) * radius;
+      const endX = x + Math.cos(end) * radius;
+      const endY = y + Math.sin(end) * radius;
+      const largeArc = end - start > Math.PI ? 1 : 0;
+      return [
+        `M ${x.toFixed(2)} ${y.toFixed(2)}`,
+        `L ${startX.toFixed(2)} ${startY.toFixed(2)}`,
+        `A ${radius} ${radius} 0 ${largeArc} 1 ${endX.toFixed(2)} ${endY.toFixed(2)}`,
+        "Z"
+      ].join(" ");
+    }
+
+    function stationLineColors(codes) {
+      const colors = [];
+      for (const code of codes || []) {
+        const color = lineColor(lineNameForCode(code));
+        if (!colors.includes(color)) colors.push(color);
+      }
+      return colors;
+    }
+
+    function lineNameForCode(code) {
+      const prefix = String(code).replace(/[0-9]+.*/, "");
+      return {
+        NS: "North South Line",
+        EW: "East West Line",
+        CG: "East West Line",
+        NE: "North East Line",
+        CC: "Circle Line",
+        CE: "Circle Line",
+        DT: "Downtown Line",
+        TE: "Thomson-East Coast Line"
+      }[prefix] || "";
+    }
+
+    function labelSvg(item, index) {
+        const label = `#${item.rank} ${item.name}`;
+        const labelX = Math.min(item.x + 13, MAP_WIDTH - label.length * 7 - 10);
+        const labelY = Math.max(16, Math.min(item.y + (index % 2 ? 15 : -15), MAP_HEIGHT - 16));
+        return `<text class="marker-label" x="${labelX}" y="${labelY}">${escapeHtml(label)}</text>`;
+    }
+
+    function legendSvg(width, height) {
+      const items = [
+        ["North South Line", "NSL"],
+        ["East West Line", "EWL"],
+        ["North East Line", "NEL"],
+        ["Circle Line", "CCL"],
+        ["Downtown Line", "DTL"],
+        ["Thomson-East Coast Line", "TEL"]
+      ];
+      const x = 14;
+      const y = height - 20;
+      const legendItems = items.map(([lineName, label], index) => {
+        const offset = index * 54;
+        return `
+          <circle cx="${x + offset + 5}" cy="${y}" r="5" fill="${lineColor(lineName)}" stroke="#1b2628" stroke-width="1.5" vector-effect="non-scaling-stroke"></circle>
+          <text x="${x + offset + 14}" y="${y + 4}" fill="#1b2628" font-size="11" font-weight="800">${label}</text>
+        `;
+      }).join("");
+      return `<g class="map-legend">${legendItems}</g>`;
+    }
+
+    function showMapTooltip(marker) {
+      mapTooltip.innerHTML = `${escapeHtml(marker.dataset.label)}<span>${escapeHtml(marker.dataset.detail)}</span>`;
+      mapTooltip.classList.add("is-visible");
+      const markerRect = marker.getBoundingClientRect();
+      const shellRect = resultMap.parentElement.getBoundingClientRect();
+      const tooltipWidth = mapTooltip.offsetWidth || 180;
+      const tooltipHeight = mapTooltip.offsetHeight || 54;
+      const x = markerRect.left + markerRect.width / 2 - shellRect.left;
+      const y = markerRect.top + markerRect.height / 2 - shellRect.top;
+      const left = Math.min(Math.max(8, x + 12), shellRect.width - tooltipWidth - 8);
+      const top = Math.min(Math.max(tooltipHeight / 2 + 8, y), shellRect.height - tooltipHeight / 2 - 8);
+      mapTooltip.style.left = `${left}px`;
+      mapTooltip.style.top = `${top}px`;
+    }
+
+    function hideMapTooltip() {
+      mapTooltip.classList.remove("is-visible");
     }
 
     function routeTimeline(item, destination) {
