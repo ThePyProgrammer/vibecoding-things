@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="A cheeky gallery of Prannay's vibe-coded experiments, games, utilities, and half-serious ideas."
+    >
+    <title>vibes.prannay.dev</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="_home/styles.css">
+  </head>
+  <body>
+    <div class="grain" aria-hidden="true"></div>
+
+    <main class="shelf-page">
+      <section class="shelf-intro" aria-labelledby="shelf-title">
+        <p class="eyebrow">vibes.prannay.dev</p>
+        <h1 id="shelf-title">vibe-coded things</h1>
+        <p>
+          A small public shelf of browser tabs that escaped the notes app. Hover or tap a tile for the label,
+          then open it if you want to inspect the incident.
+        </p>
+      </section>
+
+      <div class="filter-bar" aria-label="Filter experiments">
+        <button class="filter active" type="button" data-filter="all">all</button>
+        <button class="filter" type="button" data-filter="game">games</button>
+        <button class="filter" type="button" data-filter="tool">tools</button>
+        <button class="filter" type="button" data-filter="prototype">prototypes</button>
+      </div>
+
+      <section class="gallery" id="shelf" aria-label="Vibe-coded experiment gallery"></section>
+    </main>
+
+    <script src="_home/app.js"></script>
+  </body>
+</html>
